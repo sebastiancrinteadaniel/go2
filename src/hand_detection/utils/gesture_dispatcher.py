@@ -4,8 +4,8 @@ import time
 
 def build_gesture_actions(sport_client):
     return {
-        5: custom_stand_up(sport_client),
-        6: custom_stand_down(sport_client),
+        5: lambda: thumb_up_action(sport_client),
+        6: lambda: thumb_down_action(sport_client),
         4: sport_client.Hello,
     }
 
@@ -32,10 +32,10 @@ class GestureDispatcher:
 
 
 
-def custom_stand_down(sport_client):
+def thumb_down_action(sport_client):
     sport_client.StopMove()
     sport_client.StandDown()
 
-def custom_stand_up(sport_client):
+def thumb_up_action(sport_client):
     sport_client.StandUp()
     sport_client.FreeWalk()

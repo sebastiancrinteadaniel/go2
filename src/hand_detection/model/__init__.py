@@ -1,3 +1,3 @@
-from model.keypoint_classifier.keypoint_classifier import KeyPointClassifier
+from .keypoint_classifier.keypoint_classifier import KeyPointClassifier
 
-__all__ = ["KeyPointClassifier"]
+__all__ = [KeyPointClassifier]

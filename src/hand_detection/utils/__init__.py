@@ -1,5 +1,4 @@
-from utils.cvfpscalc import CvFpsCalc
-from utils.utils import (
+from .utils import (
     draw_info,
     draw_info_text,
     calc_bounding_rect,
@@ -8,10 +7,9 @@ from utils.utils import (
     draw_bounding_rect,
     draw_landmarks,
 )
-from utils.gesture_dispatcher import GestureDispatcher, build_gesture_actions
+from .gesture_dispatcher import GestureDispatcher, build_gesture_actions
 
 __all__ = [
-    CvFpsCalc,
     draw_info,
     draw_info_text,
     calc_bounding_rect,
