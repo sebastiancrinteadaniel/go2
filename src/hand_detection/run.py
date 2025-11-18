@@ -247,6 +247,9 @@ def main():
     infer_every_n = max(1, int(proc_cfg.get("infer_every_n", 1)))
     tflite_threads = max(1, int(proc_cfg.get("tflite_threads", 2)))
 
+    width = int(disp.get("width", 640))
+    height = int(disp.get("height", 480))
+
     use_brect = True
 
     # Camera preparation -----------------------------------------------------------
@@ -325,6 +328,17 @@ def main():
             if last_vis is None:
                 continue
 
+
+            shown = last_vis
+            if width and height:
+                try:
+                    h, w = shown.shape[:2]
+                    if (w != width) or (h != height):
+                        shown = cv.resize(shown, (width, height), interpolation=cv.INTER_AREA)
+                except Exception:
+                    pass
+            # cv.imshow(window, shown)
+
             # Overlay FPS metrics
             with ctx.fps_lock:
                 cam_fps = ctx.camera_fps
@@ -333,7 +347,7 @@ def main():
             cv.putText(last_vis, f"Infer FPS: {inf_fps:.2f}", (20, 75), cv.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,255), 2)
             cv.putText(last_vis, f"Display FPS: {disp_fps:.2f}", (20, 110), cv.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,0), 2)
 
-            cv.imshow(window_name, last_vis)
+            cv.imshow(window_name, shown)
     finally:
         stop_event.set()
         time.sleep(0.05)
