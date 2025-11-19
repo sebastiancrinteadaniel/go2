@@ -330,13 +330,9 @@ def main():
 
 
             shown = last_vis
-            if width and height:
-                try:
-                    h, w = shown.shape[:2]
-                    if (w != width) or (h != height):
-                        shown = cv.resize(shown, (width, height), interpolation=cv.INTER_AREA)
-                except Exception:
-                    pass
+            # if width and height:
+            #     shown = cv.resize(shown, (width, height), interpolation=cv.INTER_AREA)
+               
             # cv.imshow(window, shown)
 
             # Overlay FPS metrics

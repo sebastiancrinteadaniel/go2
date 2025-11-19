@@ -23,8 +23,8 @@ class YoloCtx:
     do_flip: bool
     imgsz: int
     conf: float
-    frame_queue: "queue.Queue[tuple[int, Any] | tuple[None, None]]"
-    result_queue: "queue.Queue[tuple[int, Any, Any]]"
+    frame_queue: queue.Queue
+    result_queue: queue.Queue
     drop_if_full: bool
     stop_event: threading.Event
     fps_lock: threading.Lock
@@ -146,8 +146,8 @@ def main():
     # Create camera without forcing resolution to better match example behavior
     camera = create_camera(
         source=source,
-        width=0,
-        height=0,
+        width=width,
+        height=height,
         device=device,
         video_path=video_path,
         go2_timeout=go2_timeout,
