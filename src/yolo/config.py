@@ -13,7 +13,7 @@ CONFIG = {
         "imgsz": 640,
         # Threading options
         # When enabled, capture/inference/display run in separate threads
-        "enable_threads": True,
+        "enable_threads": False,
         # Number of inference worker threads. If > 1, each worker may load
         # its own model instance for better parallelism depending on backend.
         "workers": 1,

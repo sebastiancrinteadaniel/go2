@@ -1,9 +1,11 @@
 # Hand-detection-like config for common use across modules
 CONFIG = {
     "display": {
-        "width": 640,
-        "height": 480,
-        "draw": True,
+        "width": 1280,
+        "height": 720,
+            "draw": True,
+            # Separate flag to control FPS overlay independently of other drawings
+            "draw_fps": True,
         "window_name": "Computer Vision",
     },
     "camera": {

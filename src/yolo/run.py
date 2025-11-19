@@ -3,17 +3,19 @@ import threading
 import queue
 import time
 from dataclasses import dataclass
-from typing import Optional, Any
+from typing import Any
+
+
+from ..common.cameras import create_camera
+from ..common.config import CONFIG as COMMON_CONFIG
+from .config import CONFIG
 
 import cv2 as cv
 
-try:
-    from ultralytics import YOLO  # type: ignore
-except Exception as e:  # pragma: no cover - helpful runtime message
-    YOLO = None  # type: ignore
-    _ultra_err: Optional[Exception] = e
-else:
-    _ultra_err = None
+from ..common.fps import CvFpsCalc, draw_info_fps
+
+
+from ultralytics import YOLO
 
 
 @dataclass
@@ -28,8 +30,7 @@ class YoloCtx:
     drop_if_full: bool
     stop_event: threading.Event
     fps_lock: threading.Lock
-    
-    # FPS values (written by threads)
+
     camera_fps_val: float = 0.0
     yolo_fps_val: float = 0.0
 
@@ -101,22 +102,6 @@ def inference_worker(ctx: YoloCtx, mdl: Any):
 
 
 def main():
-    if YOLO is None:
-        print("Ultralytics is not installed.")
-        print("Install with: pip install ultralytics")
-        if _ultra_err is not None:
-            print(f"Import error: {_ultra_err}")
-        sys.exit(1)
-
-    # Reuse shared camera abstraction and configs
-    try:
-        from ..common.cameras import create_camera
-        from ..common.config import CONFIG as COMMON_CONFIG
-        from .config import CONFIG  # YOLO-specific only, absolute import
-    except Exception as e:
-        print(f"Failed to import camera/common/yolo config: {e}")
-        sys.exit(1)
-
     disp = COMMON_CONFIG.get("display", {})
     cam_cfg = COMMON_CONFIG.get("camera", {})
     yolo_cfg = CONFIG.get("yolo", {})
@@ -134,6 +119,7 @@ def main():
     height = int(disp.get("height", 480))
     window = str(disp.get("window_name", "YOLO"))
     do_flip = bool(disp.get("flip", True))
+    draw_fps_enabled = bool(disp.get("draw_fps", True))
 
     model_path = str(yolo_cfg.get("model", "yolov8n.pt"))
     conf = float(yolo_cfg.get("conf", 0.25))
@@ -146,8 +132,8 @@ def main():
     # Create camera without forcing resolution to better match example behavior
     camera = create_camera(
         source=source,
-        width=width,
-        height=height,
+        width=0,
+        height=0,
         device=device,
         video_path=video_path,
         go2_timeout=go2_timeout,
@@ -163,8 +149,6 @@ def main():
 
     # FPS counter (shared implementation)
     try:
-        from ..common.fps import CvFpsCalc
-
         cvFpsCalc = CvFpsCalc(buffer_len=10)
     except Exception:
         cvFpsCalc = None
@@ -202,16 +186,11 @@ def main():
             if cvFpsCalc is not None:
                 fps = cvFpsCalc.get()
 
-            cv.putText(
-                vis,
-                f"FPS: {fps:.1f}",
-                (10, 30),
-                cv.FONT_HERSHEY_SIMPLEX,
-                1.0,
-                (0, 255, 0),
-                2,
-                cv.LINE_AA,
-            )
+            if draw_fps_enabled:
+                vis = draw_info_fps(
+                    vis, f"display {fps:.1f}", font_scale=0.6, thickness=1, margin=6
+                )
+
             cv.imshow(window, vis)
 
         camera.release()
@@ -238,14 +217,18 @@ def main():
     )
 
     # Start capture thread
-    cap_thread = threading.Thread(target=capture_loop, args=(ctx,), name="capture", daemon=True)
+    cap_thread = threading.Thread(
+        target=capture_loop, args=(ctx,), name="capture", daemon=True
+    )
     cap_thread.start()
 
     # Start worker threads
     worker_threads = []
     if workers <= 1:
         worker_threads.append(
-            threading.Thread(target=inference_worker, args=(ctx, model), name="worker-0", daemon=True)
+            threading.Thread(
+                target=inference_worker, args=(ctx, model), name="worker-0", daemon=True
+            )
         )
         worker_threads[0].start()
     else:
@@ -256,7 +239,12 @@ def main():
             except Exception as e:
                 print(f"Worker {wi} failed to init model: {e}")
                 mdl = model
-            t = threading.Thread(target=inference_worker, args=(ctx, mdl), name=f"worker-{wi}", daemon=True)
+            t = threading.Thread(
+                target=inference_worker,
+                args=(ctx, mdl),
+                name=f"worker-{wi}",
+                daemon=True,
+            )
             t.start()
             worker_threads.append(t)
 
@@ -278,49 +266,23 @@ def main():
 
             if cvFpsCalc is not None:
                 fps = cvFpsCalc.get()
-            cv.putText(
-                last_vis,
-                f"Display FPS: {fps:.1f}",
-                (10, 30),
-                cv.FONT_HERSHEY_SIMPLEX,
-                1.0,
-                (0, 255, 0),
-                2,
-                cv.LINE_AA,
-            )
             with ctx.fps_lock:
                 cam_fps = ctx.camera_fps_val
                 det_fps = ctx.yolo_fps_val
-            cv.putText(
-                last_vis,
-                f"Camera FPS: {cam_fps:.1f}",
-                (10, 65),
-                cv.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (0, 255, 255),
-                2,
-                cv.LINE_AA,
-            )
-            cv.putText(
-                last_vis,
-                f"YOLO FPS: {det_fps:.1f}",
-                (10, 95),
-                cv.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (255, 255, 0),
-                2,
-                cv.LINE_AA,
-            )
-            # Resize for display only; avoid impacting capture/inference
-            shown = last_vis
-            if width and height:
+
+            # Draw unified black top bar with white text (single row, smaller)
+            if draw_fps_enabled:
                 try:
-                    h, w = shown.shape[:2]
-                    if (w != width) or (h != height):
-                        shown = cv.resize(shown, (width, height), interpolation=cv.INTER_AREA)
+                    info_line = (
+                        f"display {fps:.1f}   camera {cam_fps:.1f}   yolo {det_fps:.1f}"
+                    )
+                    last_vis = draw_info_fps(
+                        last_vis, info_line, font_scale=0.6, thickness=1, margin=6
+                    )
                 except Exception:
                     pass
-            cv.imshow(window, shown)
+
+            cv.imshow(window, last_vis)
     finally:
         stop_event.set()
         # Let queues drain briefly
