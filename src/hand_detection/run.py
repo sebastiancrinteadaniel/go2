@@ -22,6 +22,7 @@ from .model import KeyPointClassifier
 from .config import CONFIG
 from ..common.cameras import create_camera
 from ..common.fps import CvFpsCalc, draw_info_fps
+from ..common.visual import resize_for_display
 
 
 def _load_labels():
@@ -80,11 +81,13 @@ def main():
     source = cam_cfg.get("source", "opencv")
     device = int(cam_cfg.get("device", 0))
     video_path = cam_cfg.get("video_path", "debug_video.mp4")
+    cam_width = int(cam_cfg.get("width", 0))
+    cam_height = int(cam_cfg.get("height", 0))
     go2 = cam_cfg.get("go2", {})
     camera = create_camera(
         source=source,
-        width=0,
-        height=0,
+        width=cam_width,
+        height=cam_height,
         device=device,
         video_path=video_path,
         go2_timeout=float(go2.get("timeout_sec", 3.0)),
@@ -228,7 +231,11 @@ def main():
                     margin=6,
                 )
 
-            cv.imshow(window_name, debug_image)
+            try:
+                debug_rs = resize_for_display(debug_image, cap_width, cap_height)
+            except Exception:
+                debug_rs = debug_image
+            cv.imshow(window_name, debug_rs)
 
     camera.release()
     cv.destroyAllWindows()

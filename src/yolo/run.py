@@ -13,6 +13,7 @@ from .config import CONFIG
 import cv2 as cv
 
 from ..common.fps import CvFpsCalc, draw_info_fps
+from ..common.visual import resize_for_display
 
 
 from ultralytics import YOLO
@@ -106,10 +107,12 @@ def main():
     cam_cfg = COMMON_CONFIG.get("camera", {})
     yolo_cfg = CONFIG.get("yolo", {})
 
-    # Read values purely from config dicts
+    # Read values purely from config dicts (camera)
     source = str(cam_cfg.get("source", "opencv"))
     device = int(cam_cfg.get("device", 0))
     video_path = str(cam_cfg.get("video_path", ""))
+    cam_width = int(cam_cfg.get("width", 0))
+    cam_height = int(cam_cfg.get("height", 0))
     go2 = cam_cfg.get("go2", {})
     go2_timeout = float(go2.get("timeout_sec", 3.0))
     go2_init_channel = bool(go2.get("init_channel", True))
@@ -132,8 +135,8 @@ def main():
     # Create camera without forcing resolution to better match example behavior
     camera = create_camera(
         source=source,
-        width=0,
-        height=0,
+        width=cam_width,
+        height=cam_height,
         device=device,
         video_path=video_path,
         go2_timeout=go2_timeout,
@@ -191,7 +194,12 @@ def main():
                     vis, f"display {fps:.1f}", font_scale=0.6, thickness=1, margin=6
                 )
 
-            cv.imshow(window, vis)
+            # Optional resize prior to display
+            try:
+                vis_rs = resize_for_display(vis, width, height)
+            except Exception:
+                vis_rs = vis
+            cv.imshow(window, vis_rs)
 
         camera.release()
         cv.destroyAllWindows()
@@ -282,7 +290,12 @@ def main():
                 except Exception:
                     pass
 
-            cv.imshow(window, last_vis)
+            # Resize last visualization if requested
+            try:
+                last_vis_rs = resize_for_display(last_vis, width, height)
+            except Exception:
+                last_vis_rs = last_vis
+            cv.imshow(window, last_vis_rs)
     finally:
         stop_event.set()
         # Let queues drain briefly
