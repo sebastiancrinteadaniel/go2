@@ -145,7 +145,7 @@ def main():
 
     # Load model (one eager instance; more may be created for extra workers)
     try:
-        model = YOLO(model_path)
+        model = YOLO(model_path, task="detect")
     except Exception as e:
         print(f"Failed to load YOLO model '{model_path}': {e}")
         sys.exit(1)
