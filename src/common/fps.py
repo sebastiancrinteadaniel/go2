@@ -71,8 +71,8 @@ def draw_info_fps(
     bar_height = 2 * margin + total_text_height + baseline
     bar_height = max(bar_height, margin * 2 + 16)
     
-    # Add black border at the top instead of drawing over the image
-    image = cv.copyMakeBorder(image, bar_height, 0, 0, 0, cv.BORDER_CONSTANT, value=(0, 0, 0))
+    # Draw black bar directly on the image (without changing dimensions)
+    cv.rectangle(image, (0, 0), (w, bar_height), (0, 0, 0), -1)
 
     # Draw each line in white
     y = margin + text_heights[0]

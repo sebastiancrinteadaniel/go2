@@ -16,7 +16,7 @@ CONFIG = {
         "fps": 30,
         
         # Analysis settings
-        "model_path": "src/yolo/model/yolov8n.pt",
+        "model_path": "src/depth_camera/model/yolov8n.pt",
         "depth_threshold_m": 0.5, # Threshold for depth segmentation (meters)
         "min_contour_area": 1000, # Minimum area for contour detection
     }
