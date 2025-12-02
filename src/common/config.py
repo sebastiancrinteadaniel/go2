@@ -8,7 +8,7 @@ CONFIG = {
         "window_name": "Computer Vision",
     },
     "camera": {
-        "source": "opencv",  # opencv | video | go2
+        "source": "go2",  # opencv | video | go2
         "device": 0,
         "video_path": "",
         # Request capture resolution (only applied when >0). If either is 0 the

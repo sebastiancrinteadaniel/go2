@@ -1,12 +1,57 @@
-# unitree_sdk2_python
-Python interface for unitree sdk2
+# Unitree Go2 Command Center
 
-# Installation
+A comprehensive web-based dashboard for controlling the Unitree Go2 robot, managing computer vision modules, and monitoring telemetry.
+
+## Features
+- **Web Dashboard**: Control everything from a browser.
+- **Computer Vision**:
+  - **YOLOv8**: Object detection.
+  - **Hand Detection**: Gesture control.
+  - **Depth Camera**: Distance mapping.
+  - **Simple Camera**: Low-latency raw feed.
+- **Telemetry**: Real-time battery, temperature, and system stats.
+- **Motion Control**: Virtual Gamepad (WASD + Numpad) for driving.
+
+## Quick Start
+
+1. **Activate Environment** (if using venv):
+   ```bash
+   source .venv/bin/activate
+   ```
+
+2. **Run Dashboard**:
+   ```bash
+   # Simulation / Loopback
+   python3 -m src.dashboard.app
+
+   # Real Robot (replace eth0 with your interface)
+   python3 -m src.dashboard.app eth0
+   ```
+
+3. **Open Browser**:
+   Navigate to `http://localhost:8000` (or your Jetson's IP).
+
+## Troubleshooting
+
+### Cleaning up stuck processes
+The dashboard now automatically cleans up stuck processes on startup. However, if you need to manually kill everything:
+
+```bash
+# Kill all dashboard-related python processes
+pkill -f "src\."
+```
+
+### Installation
 ## Dependencies
 - Python >= 3.8
 - cyclonedds == 0.10.2
 - numpy
 - opencv-python
+- fastapi
+- uvicorn
+- psutil
+- ultralytics (for YOLO)
+- mediapipe (for Hand Detection)
 
 ### Installing from source
 Execute the following commands in the terminal:
