@@ -8,9 +8,9 @@ Usage:
 
 CONFIG = {
     "yolo": {
-        "model": "src/yolo/model/yolov8n.engine",
+        "model": "src/yolo/model/yolov8n.pt",
         "conf": 0.25,
-        "imgsz": 640,
+        "imgsz": 320,
         # Threading options
         # When enabled, capture/inference/display run in separate threads
         "enable_threads": True,

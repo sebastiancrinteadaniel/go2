@@ -18,7 +18,7 @@ CONFIG = {
     },
     "processing": {
         # Scale factor for the image used for inference (0.3 ~ 1.0). Smaller is faster
-        "process_scale": 0.7,
+        "process_scale": 0.5,
         # Run hand inference every N frames (>=1)
         "infer_every_n": 1,
         # Number of TFLite threads for the classifiers

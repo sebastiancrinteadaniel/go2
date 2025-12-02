@@ -75,8 +75,18 @@ async def lifespan(app: FastAPI):
                 ChannelFactoryInitialize(0, INTERFACE)
                 logger.info(f"Initialized SDK with interface: {INTERFACE}")
             else:
-                ChannelFactoryInitialize(0, "lo")
-                logger.info("Initialized SDK with loopback interface")
+                # Auto-detect environment
+                # On Jetson (Robot), the internal interface is usually eth0
+                # We check for Jetson-specific file or if we are on a Unitree board
+                is_jetson = os.path.exists("/etc/nv_tegra_release")
+                has_eth0 = "eth0" in psutil.net_if_addrs()
+                
+                if is_jetson and has_eth0:
+                    ChannelFactoryInitialize(0, "eth0")
+                    logger.info("Detected Jetson environment. Initialized SDK with eth0.")
+                else:
+                    ChannelFactoryInitialize(0, "lo")
+                    logger.info("Initialized SDK with loopback interface")
             
             telemetry.start()
             
