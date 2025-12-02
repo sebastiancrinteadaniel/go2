@@ -22,7 +22,7 @@ CONFIG = {
         "password": "",
         
         # Display settings
-        "width": 1280,
-        "height": 720,
+        "width": 640,
+        "height": 480,
     }
 }
