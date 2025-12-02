@@ -8,7 +8,7 @@ Usage:
 
 CONFIG = {
     "yolo": {
-        "model": "src/yolo/model/yolo11n.pt",
+        "model": "src/yolo/model/yolov8n.engine",
         "conf": 0.25,
         "imgsz": 640,
         # Threading options

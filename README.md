@@ -111,3 +111,20 @@ Replace `enp2s0` with the name of the network interface to which the robot is co
 python3 ./example/vui_client/vui_client_example.py enp2s0
 ```
 Replace `enp2s0` with the name of the network interface to which the robot is connected.T he robot will cycle the volume and light brightness. The interface is detailed at https://support.unitree.com/home/en/developer/VuiClient
+
+## WebRTC Camera Streaming
+To stream the Go2 camera via WebRTC using `unitree_webrtc_connect`:
+
+1. Install dependencies:
+```bash
+pip install -r requirements-webrtc.txt
+```
+
+2. Run the WebRTC viewer:
+```bash
+# Set configuration via environment variables if needed (defaults to LocalSTA 192.168.8.181)
+export WEBRTC_METHOD=LocalSTA
+export WEBRTC_IP=192.168.8.181
+
+python3 -m src.webrtc.run
+```

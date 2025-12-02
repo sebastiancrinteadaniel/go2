@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unitree Go2 Camera Stream</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e1e;
+            color: #f0f0f0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        header {
+            width: 100%;
+            background-color: #2d2d2d;
+            padding: 1rem 0;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            margin-bottom: 2rem;
+        }
+        h1 {
+            margin: 0;
+            font-weight: 300;
+            letter-spacing: 1px;
+        }
+        .container {
+            background-color: #252526;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            max-width: 90%;
+        }
+        .video-container {
+            position: relative;
+            border-radius: 4px;
+            overflow: hidden;
+            background-color: #000;
+            min-width: 640px;
+            min-height: 360px;
+        }
+        img {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+        .status {
+            margin-top: 1rem;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+        .badge {
+            background-color: #0e639c;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Unitree Go2 WebRTC Stream</h1>
+    </header>
+    <div class="container">
+        <div class="video-container">
+            <img src="/video_feed" alt="Camera Stream" />
+        </div>
+        <div class="status">
+            <span>Status: <span class="badge">Live</span></span>
+            <span>Source: WebRTC &rarr; MJPEG</span>
+        </div>
+    </div>
+</body>
+</html>
