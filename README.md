@@ -31,6 +31,41 @@ A comprehensive web-based dashboard for controlling the Unitree Go2 robot, manag
 3. **Open Browser**:
    Navigate to `http://localhost:8000` (or your Jetson's IP).
 
+## Laptop Client (Remote Control via WiFi)
+
+Run the dashboard from your laptop and control the robot wirelessly via WebRTC.
+This is useful when you want to:
+- Run CV/AI on your powerful laptop GPU instead of the Jetson
+- Control the robot remotely without running apps on the robot
+- Monitor the robot from any device on the same WiFi network
+
+### Setup
+
+1. **Install WebRTC dependencies** on your laptop:
+   ```bash
+   pip install unitree-webrtc-connect aiortc aiohttp
+   ```
+
+2. **Connect to the Go2's WiFi** or ensure both are on the same network.
+
+3. **Run the Laptop Client**:
+   ```bash
+   # Replace with your robot's IP address
+   python3 -m src.laptop_client 192.168.123.18
+   
+   # Or edit src/laptop_client/config.py and run:
+   python3 -m src.laptop_client
+   ```
+
+4. **Open Browser** at `http://localhost:8000`
+
+### Features
+- Live camera feed via WebRTC
+- WASD + QE keyboard control
+- Robot actions (Stand, Sit, Dance, etc.)
+- Battery and temperature monitoring
+- Low latency connection
+
 ## Troubleshooting
 
 ### Cleaning up stuck processes

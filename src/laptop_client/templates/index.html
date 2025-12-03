@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go2 Laptop Client</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .logs-container { font-family: 'Fira Code', monospace; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center shadow-lg z-10">
+        <div class="flex items-center gap-3">
+            <div id="connection-led" class="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></div>
+            <h1 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-300 bg-clip-text text-transparent">
+                Go2 Laptop Client
+            </h1>
+            <span class="text-xs bg-cyan-900/50 px-2 py-1 rounded text-cyan-300 border border-cyan-700">WebRTC</span>
+        </div>
+        <div class="text-sm text-slate-400 flex gap-4 items-center">
+            <div class="flex gap-2 items-center bg-slate-700/50 px-3 py-1 rounded-full border border-slate-600">
+                <span class="text-xs font-bold text-slate-300">CPU</span>
+                <div class="w-16 h-2 bg-slate-600 rounded-full overflow-hidden">
+                    <div id="cpu-bar" class="h-full bg-blue-500 transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <span id="cpu-text" class="text-xs font-mono w-8 text-right">0%</span>
+            </div>
+            <div class="flex gap-2 items-center bg-slate-700/50 px-3 py-1 rounded-full border border-slate-600">
+                <span class="text-xs font-bold text-slate-300">RAM</span>
+                <div class="w-16 h-2 bg-slate-600 rounded-full overflow-hidden">
+                    <div id="ram-bar" class="h-full bg-purple-500 transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <span id="ram-text" class="text-xs font-mono w-8 text-right">0%</span>
+            </div>
+            
+            <!-- Robot Stats -->
+            <div class="h-6 w-px bg-slate-700 mx-2"></div>
+            
+            <div class="flex gap-2 items-center bg-slate-700/50 px-3 py-1 rounded-full border border-slate-600 opacity-50" id="robot-stats-container">
+                <div class="flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                    <div class="w-12 h-1.5 bg-slate-600 rounded-full overflow-hidden">
+                        <div id="bat-bar" class="h-full bg-green-500 transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <span id="bat-text" class="text-xs font-mono w-8 text-right">--%</span>
+                </div>
+                <div class="w-px h-3 bg-slate-600 mx-1"></div>
+                <div class="flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-400"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path></svg>
+                    <span id="temp-text" class="text-xs font-mono">--°C</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-slate-500">Robot:</span>
+                <span class="font-mono text-cyan-400">{{ robot_ip }}</span>
+            </div>
+            
+            <button id="control-btn" onclick="toggleControl()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1 rounded-full text-xs font-bold border border-slate-600 transition-colors flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-slate-500" id="control-led"></div>
+                GAMEPAD
+            </button>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        <!-- Sidebar Controls -->
+        <aside class="w-80 bg-slate-800 border-r border-slate-700 flex flex-col overflow-y-auto">
+            <div class="p-4 space-y-6">
+                {% for id, mod in modules.items() %}
+                <div class="bg-slate-700/50 rounded-xl p-4 border border-slate-600 shadow-sm transition-all hover:border-slate-500">
+                    <div class="flex justify-between items-start mb-3">
+                        <h3 class="font-semibold text-lg text-slate-100">{{ mod.name }}</h3>
+                        <div id="status-{{ id }}" class="w-2 h-2 rounded-full bg-red-500 mt-2"></div>
+                    </div>
+                    <p class="text-xs text-slate-400 mb-4 h-10">{{ mod.description }}</p>
+                    
+                    <div class="flex gap-2">
+                        <button onclick="toggleModule('{{ id }}')" id="btn-{{ id }}" 
+                            class="flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors bg-slate-600 hover:bg-slate-500 text-white">
+                            Start
+                        </button>
+                        <button onclick="viewModule('{{ id }}', {{ mod.port }})" 
+                            class="py-2 px-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 border border-slate-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- Robot Actions -->
+                <div class="bg-slate-700/50 rounded-xl p-4 border border-slate-600 shadow-sm">
+                    <h3 class="font-semibold text-lg text-slate-100 mb-3">Robot Actions</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="sendAction('stand_up')" class="py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors">Stand Up</button>
+                        <button onclick="sendAction('stand_down')" class="py-2 px-3 rounded-lg bg-slate-600 hover:bg-slate-500 text-white text-sm font-medium transition-colors">Sit Down</button>
+                        <button onclick="sendAction('recovery')" class="py-2 px-3 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors col-span-2">Recovery Stand</button>
+                        <button onclick="sendAction('damp')" class="py-2 px-3 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors">Damp</button>
+                        <button onclick="sendAction('hello')" class="py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium transition-colors">Hello</button>
+                        
+                        <!-- Fun Actions -->
+                        <button onclick="sendAction('stretch')" class="py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-colors">Stretch</button>
+                        <button onclick="sendAction('dance1')" class="py-2 px-3 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-sm font-medium transition-colors">Dance 1</button>
+                        <button onclick="sendAction('dance2')" class="py-2 px-3 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-sm font-medium transition-colors">Dance 2</button>
+                        <button onclick="sendAction('heart')" class="py-2 px-3 rounded-lg bg-rose-500 hover:bg-rose-400 text-white text-sm font-medium transition-colors">Heart</button>
+                    </div>
+                </div>
+
+                <!-- Visual Gamepad -->
+                <div class="bg-slate-700/50 rounded-xl p-4 border border-slate-600 shadow-sm">
+                    <h3 class="font-semibold text-lg text-slate-100 mb-3">Control State</h3>
+                    <div class="flex flex-col items-center gap-2 select-none">
+                        <!-- Forward -->
+                        <div id="key-w" class="w-10 h-10 rounded bg-slate-800 border border-slate-600 flex items-center justify-center font-bold text-slate-400 transition-all shadow-sm">W</div>
+                        <div class="flex gap-2">
+                            <!-- Left (Strafe) -->
+                            <div id="key-a" class="w-10 h-10 rounded bg-slate-800 border border-slate-600 flex items-center justify-center font-bold text-slate-400 transition-all shadow-sm">A</div>
+                            <!-- Backward -->
+                            <div id="key-s" class="w-10 h-10 rounded bg-slate-800 border border-slate-600 flex items-center justify-center font-bold text-slate-400 transition-all shadow-sm">S</div>
+                            <!-- Right (Strafe) -->
+                            <div id="key-d" class="w-10 h-10 rounded bg-slate-800 border border-slate-600 flex items-center justify-center font-bold text-slate-400 transition-all shadow-sm">D</div>
+                        </div>
+                        <!-- Turn Keys -->
+                        <div class="flex gap-2 mt-2">
+                            <div id="key-q" class="w-10 h-10 rounded bg-slate-800 border border-slate-600 flex items-center justify-center font-bold text-slate-400 transition-all shadow-sm text-xs">Q↺</div>
+                            <div id="key-e" class="w-10 h-10 rounded bg-slate-800 border border-slate-600 flex items-center justify-center font-bold text-slate-400 transition-all shadow-sm text-xs">E↻</div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-center">
+                        <div id="control-status" class="text-xs font-mono text-slate-500">Waiting for input...</div>
+                        <div id="velocity-display" class="text-[10px] font-mono text-slate-400 mt-1">VX: 0.0 | VY: 0.0 | W: 0.0</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col relative bg-slate-900">
+            <!-- Video Grid -->
+            <div id="video-grid" class="flex-1 p-6 grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto">
+                <!-- Placeholders will be injected here -->
+                <div class="flex items-center justify-center h-full text-slate-500 border-2 border-dashed border-slate-700 rounded-2xl">
+                    Select a module to view stream
+                </div>
+            </div>
+
+            <!-- Logs Panel -->
+            <div class="h-48 bg-black border-t border-slate-700 flex flex-col">
+                <div class="bg-slate-800 px-4 py-1 text-xs font-mono text-slate-400 flex justify-between items-center select-none">
+                    <span>SYSTEM LOGS</span>
+                    <span id="log-status" class="text-green-500">● Connected</span>
+                </div>
+                <div id="logs" class="flex-1 overflow-y-auto p-4 font-mono text-xs text-green-400 space-y-1 logs-container">
+                    <div class="opacity-50">Initializing WebRTC connection...</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Fullscreen Modal -->
+    <div id="fullscreen-modal" class="fixed inset-0 z-50 bg-black/95 hidden flex flex-col items-center justify-center p-4 backdrop-blur-sm transition-all duration-300">
+        <button onclick="closeFullscreen()" class="absolute top-4 right-4 bg-slate-800/50 hover:bg-red-500 text-white p-2 rounded-full transition-colors z-50">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+        <div class="w-full h-full flex items-center justify-center relative">
+            <img id="fullscreen-img" src="" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">
+            <div id="fullscreen-stats" class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur px-6 py-3 rounded-full text-white font-mono flex gap-6 text-sm border border-white/10 shadow-xl">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const HOST = "{{ host }}";
+        const MODULES = {{ modules | tojson }};
+        const ROBOT_IP = "{{ robot_ip }}";
+        let activeStreams = new Set();
+        let fullscreenInterval = null;
+
+        function openFullscreen(id, port) {
+            const modal = document.getElementById('fullscreen-modal');
+            const img = document.getElementById('fullscreen-img');
+            const stats = document.getElementById('fullscreen-stats');
+            
+            // For simple module, use the main /video_feed, for others use their port
+            const url = (id === 'simple') ? `/video_feed` : `http://${HOST}:${port}/video_feed`;
+            img.src = url;
+            modal.classList.remove('hidden');
+            
+            if (fullscreenInterval) clearInterval(fullscreenInterval);
+            fullscreenInterval = setInterval(async () => {
+                try {
+                    const statsUrl = (id === 'simple') ? `/stats` : `http://${HOST}:${port}/stats`;
+                    const res = await fetch(statsUrl);
+                    const data = await res.json();
+                    stats.innerHTML = `
+                        <span class="text-green-400 font-bold">FPS: ${data.fps.toFixed(1)}</span>
+                        <span class="text-slate-300 border-l border-white/20 pl-4">${data.width}x${data.height}</span>
+                        <span class="text-blue-300 border-l border-white/20 pl-4">${data.info}</span>
+                    `;
+                } catch(e) {}
+            }, 1000);
+        }
+
+        function closeFullscreen() {
+            const modal = document.getElementById('fullscreen-modal');
+            const img = document.getElementById('fullscreen-img');
+            
+            modal.classList.add('hidden');
+            img.src = '';
+            if (fullscreenInterval) clearInterval(fullscreenInterval);
+        }
+
+        // WebSocket for Logs
+        const ws = new WebSocket(`ws://${window.location.host}/ws/logs`);
+        const logsDiv = document.getElementById('logs');
+
+        ws.onmessage = (event) => {
+            const div = document.createElement('div');
+            div.textContent = event.data;
+            div.className = "hover:bg-slate-800/50 px-1 rounded";
+            logsDiv.appendChild(div);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+            
+            if (logsDiv.children.length > 1000) {
+                logsDiv.removeChild(logsDiv.firstChild);
+            }
+        };
+
+        ws.onclose = () => {
+            document.getElementById('log-status').textContent = "○ Disconnected";
+            document.getElementById('log-status').className = "text-red-500";
+        };
+
+        // Control Logic
+        async function toggleModule(id) {
+            const btn = document.getElementById(`btn-${id}`);
+            const isRunning = btn.classList.contains('bg-red-500');
+            
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
+
+            try {
+                const endpoint = isRunning ? `/stop/${id}` : `/start/${id}`;
+                const res = await fetch(endpoint, { method: 'POST' });
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    updateStatus();
+                    if (!isRunning) {
+                        if (!activeStreams.has(id)) {
+                            viewModule(id, MODULES[id].port);
+                        }
+                    }
+                } else {
+                    alert(data.message);
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50');
+            }
+        }
+
+        function viewModule(id, port) {
+            const grid = document.getElementById('video-grid');
+            
+            if (grid.children.length === 1 && grid.children[0].innerText.includes('Select')) {
+                grid.innerHTML = '';
+            }
+
+            if (activeStreams.has(id)) {
+                const el = document.getElementById(`stream-${id}`);
+                if (el) el.remove();
+                activeStreams.delete(id);
+                
+                if (fpsIntervals[id]) {
+                    clearInterval(fpsIntervals[id]);
+                    delete fpsIntervals[id];
+                }
+                
+                if (activeStreams.size === 0) {
+                    grid.innerHTML = '<div class="flex items-center justify-center h-full text-slate-500 border-2 border-dashed border-slate-700 rounded-2xl">Select a module to view stream</div>';
+                }
+            } else {
+                activeStreams.add(id);
+                const card = document.createElement('div');
+                card.id = `stream-${id}`;
+                card.className = "bg-slate-800 rounded-xl overflow-hidden shadow-lg flex flex-col border border-slate-700 relative group";
+                
+                // For simple module, use the built-in /video_feed endpoint
+                const videoUrl = (id === 'simple') ? `/video_feed` : `http://${HOST}:${port}/video_feed`;
+                
+                card.innerHTML = `
+                    <div class="absolute top-2 left-2 bg-black/50 backdrop-blur px-2 py-1 rounded text-xs font-bold z-10 flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span>${MODULES[id].name}</span>
+                            <span id="fps-${id}" class="text-green-400 font-mono">FPS: --</span>
+                        </div>
+                        <div class="text-[10px] text-slate-300 font-mono flex gap-2">
+                            <span id="res-${id}">--x--</span>
+                            <span id="info-${id}" class="text-cyan-300"></span>
+                        </div>
+                    </div>
+                    <div class="absolute top-2 right-2 flex gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onclick="openFullscreen('${id}', ${port})" class="bg-blue-500/80 hover:bg-blue-500 text-white p-1 rounded shadow-lg backdrop-blur-sm" title="Fullscreen">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                        </button>
+                        <button onclick="viewModule('${id}', ${port})" class="bg-red-500/80 hover:bg-red-500 text-white p-1 rounded shadow-lg backdrop-blur-sm" title="Close">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </div>
+                    <div class="relative pt-[75%] bg-black">
+                        <img src="${videoUrl}" class="absolute top-0 left-0 w-full h-full object-contain" onerror="this.src='https://placehold.co/640x480/1e293b/475569?text=Stream+Offline'">
+                    </div>
+                `;
+                grid.appendChild(card);
+                
+                startFpsPolling(id, port);
+            }
+        }
+
+        const fpsIntervals = {};
+
+        function startFpsPolling(id, port) {
+            if (fpsIntervals[id]) clearInterval(fpsIntervals[id]);
+            
+            fpsIntervals[id] = setInterval(async () => {
+                try {
+                    const statsUrl = (id === 'simple') ? `/stats` : `http://${HOST}:${port}/stats`;
+                    const res = await fetch(statsUrl);
+                    const data = await res.json();
+                    
+                    const fpsEl = document.getElementById(`fps-${id}`);
+                    if (fpsEl) fpsEl.innerText = `FPS: ${data.fps.toFixed(1)}`;
+                    
+                    const resEl = document.getElementById(`res-${id}`);
+                    if (resEl && data.width) resEl.innerText = `${data.width}x${data.height}`;
+                    
+                    const infoEl = document.getElementById(`info-${id}`);
+                    if (infoEl && data.info) infoEl.innerText = data.info;
+                    
+                } catch (e) {}
+            }, 1000);
+        }
+
+        async function updateStatus() {
+            try {
+                const res = await fetch('/status');
+                const status = await res.json();
+                
+                for (const [id, mod] of Object.entries(MODULES)) {
+                    const btn = document.getElementById(`btn-${id}`);
+                    const dot = document.getElementById(`status-${id}`);
+                    
+                    if (status[id] === 'running') {
+                        btn.textContent = 'Stop';
+                        btn.className = "flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors bg-red-500 hover:bg-red-600 text-white";
+                        dot.className = "w-2 h-2 rounded-full bg-green-500 mt-2 shadow-[0_0_8px_rgba(34,197,94,0.6)]";
+                    } else {
+                        btn.textContent = 'Start';
+                        btn.className = "flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors bg-blue-600 hover:bg-blue-500 text-white";
+                        dot.className = "w-2 h-2 rounded-full bg-slate-600 mt-2";
+                    }
+                }
+                
+                // Update connection LED
+                const connLed = document.getElementById('connection-led');
+                if (status['simple'] === 'running') {
+                    connLed.className = "w-3 h-3 rounded-full bg-green-500 animate-pulse";
+                } else {
+                    connLed.className = "w-3 h-3 rounded-full bg-yellow-500 animate-pulse";
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        setInterval(updateStatus, 2000);
+        updateStatus();
+
+        // Poll System Stats
+        setInterval(async () => {
+            try {
+                const res = await fetch('/system_stats');
+                const data = await res.json();
+                
+                document.getElementById('cpu-bar').style.width = `${data.cpu}%`;
+                document.getElementById('cpu-text').innerText = `${Math.round(data.cpu)}%`;
+                
+                document.getElementById('ram-bar').style.width = `${data.ram_percent}%`;
+                document.getElementById('ram-text').innerText = `${Math.round(data.ram_percent)}%`;
+            } catch (e) {}
+        }, 2000);
+
+        // Poll Robot Stats
+        setInterval(async () => {
+            try {
+                const res = await fetch('/robot_stats');
+                const data = await res.json();
+                
+                const container = document.getElementById('robot-stats-container');
+                
+                if (data.connected) {
+                    container.classList.remove('opacity-50');
+                    
+                    const bat = data.battery;
+                    document.getElementById('bat-bar').style.width = `${bat}%`;
+                    document.getElementById('bat-text').innerText = `${bat}%`;
+                    
+                    const batBar = document.getElementById('bat-bar');
+                    if (bat > 60) batBar.className = "h-full bg-green-500 transition-all duration-500";
+                    else if (bat > 20) batBar.className = "h-full bg-yellow-500 transition-all duration-500";
+                    else batBar.className = "h-full bg-red-500 transition-all duration-500 animate-pulse";
+
+                    if (data.temps && data.temps.length > 0) {
+                        const maxTemp = Math.max(...data.temps);
+                        document.getElementById('temp-text').innerText = `${maxTemp}°C`;
+                    }
+                } else {
+                    container.classList.add('opacity-50');
+                }
+            } catch (e) {}
+        }, 2000);
+
+        // Robot Control
+        let controlWs = null;
+        let controlEnabled = false;
+        const keys = { w: false, a: false, s: false, d: false, q: false, e: false };
+        
+        function initControl() {
+            controlWs = new WebSocket(`ws://${window.location.host}/ws/control`);
+            controlWs.onopen = () => console.log("Control connected");
+            controlWs.onclose = () => console.log("Control disconnected");
+        }
+        
+        initControl();
+
+        function toggleControl() {
+            controlEnabled = !controlEnabled;
+            const btn = document.getElementById('control-btn');
+            const led = document.getElementById('control-led');
+            
+            if (controlEnabled) {
+                btn.classList.remove('bg-slate-700', 'text-slate-300');
+                btn.classList.add('bg-cyan-600', 'text-white');
+                led.classList.remove('bg-slate-500');
+                led.classList.add('bg-green-400', 'animate-pulse');
+                startControlLoop();
+            } else {
+                btn.classList.add('bg-slate-700', 'text-slate-300');
+                btn.classList.remove('bg-cyan-600', 'text-white');
+                led.classList.add('bg-slate-500');
+                led.classList.remove('bg-green-400', 'animate-pulse');
+                stopControlLoop();
+                if (controlWs && controlWs.readyState === WebSocket.OPEN) {
+                    controlWs.send(JSON.stringify({ vx: 0, vy: 0, vyaw: 0 }));
+                }
+            }
+        }
+
+        let controlInterval = null;
+
+        function startControlLoop() {
+            if (controlInterval) clearInterval(controlInterval);
+            controlInterval = setInterval(sendControl, 50);
+        }
+
+        function stopControlLoop() {
+            if (controlInterval) clearInterval(controlInterval);
+            controlInterval = null;
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (!controlEnabled) return;
+            const key = e.key.toLowerCase();
+            if (keys.hasOwnProperty(key)) {
+                keys[key] = true;
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (!controlEnabled) return;
+            const key = e.key.toLowerCase();
+            if (keys.hasOwnProperty(key)) {
+                keys[key] = false;
+            }
+        });
+
+        function updateKey(id, active) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (active) {
+                el.classList.remove('bg-slate-800', 'text-slate-400', 'border-slate-600');
+                el.classList.add('bg-cyan-500', 'text-white', 'border-cyan-400', 'shadow-[0_0_10px_rgba(34,211,238,0.5)]');
+            } else {
+                el.classList.add('bg-slate-800', 'text-slate-400', 'border-slate-600');
+                el.classList.remove('bg-cyan-500', 'text-white', 'border-cyan-400', 'shadow-[0_0_10px_rgba(34,211,238,0.5)]');
+            }
+        }
+
+        function sendControl() {
+            if (!controlWs || controlWs.readyState !== WebSocket.OPEN) {
+                document.getElementById('control-status').innerText = "Disconnected";
+                document.getElementById('control-status').className = "text-xs font-mono text-red-500";
+                return;
+            }
+            
+            document.getElementById('control-status').innerText = "Active";
+            document.getElementById('control-status').className = "text-xs font-mono text-green-500 animate-pulse";
+            
+            let vx = 0.0, vy = 0.0, vyaw = 0.0;
+            const speed = 0.5;
+            const turnSpeed = 1.0;
+
+            updateKey('key-w', keys.w);
+            updateKey('key-s', keys.s);
+            updateKey('key-a', keys.a);
+            updateKey('key-d', keys.d);
+            updateKey('key-q', keys.q);
+            updateKey('key-e', keys.e);
+
+            if (keys.w) vx += speed;
+            if (keys.s) vx -= speed;
+            if (keys.a) vy += speed;
+            if (keys.d) vy -= speed;
+            if (keys.q) vyaw += turnSpeed;
+            if (keys.e) vyaw -= turnSpeed;
+
+            document.getElementById('velocity-display').innerText = `VX: ${vx.toFixed(1)} | VY: ${vy.toFixed(1)} | W: ${vyaw.toFixed(1)}`;
+
+            controlWs.send(JSON.stringify({ vx, vy, vyaw }));
+        }
+
+        function sendAction(action) {
+            if (!controlWs || controlWs.readyState !== WebSocket.OPEN) {
+                initControl();
+                setTimeout(() => {
+                    if (controlWs && controlWs.readyState === WebSocket.OPEN) {
+                        controlWs.send(JSON.stringify({ action }));
+                    }
+                }, 500);
+                return;
+            }
+            controlWs.send(JSON.stringify({ action }));
+        }
+    </script>
+</body>
+</html>
