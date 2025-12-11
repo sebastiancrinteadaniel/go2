@@ -9,6 +9,7 @@ import pyrealsense2 as rs
 from ultralytics import YOLO
 
 from ..common.web_server import WebStreamer
+from ..common.fps import CvFpsCalc
 from .config import CONFIG
 
 logging.basicConfig(level=logging.INFO)
@@ -92,8 +93,8 @@ def main():
 
     logger.info("Depth Camera WebRTC started.")
 
-    fps_val = 0.0
-    prev_time = cv2.getTickCount()
+    # Use the common FPS calculator for stable readings (moving average)
+    cvFpsCalc = CvFpsCalc(buffer_len=10)
     
     # Optimization variables
     frame_count = 0
@@ -115,10 +116,8 @@ def main():
             except queue.Empty:
                 continue
             
-            curr_time = cv2.getTickCount()
-            time_diff = (curr_time - prev_time) / cv2.getTickFrequency()
-            prev_time = curr_time
-            fps_val = 1.0 / max(1e-6, time_diff)
+            # Calculate FPS using the smoothed calculator
+            fps_val = cvFpsCalc.get()
 
             # YOLO Inference (Optimized)
             if frame_count % (skip_frames + 1) == 0:
