@@ -71,7 +71,7 @@ def main():
 
     # Dispatcher
     dispatcher = _build_dispatcher_if_enabled(
-        gest_cfg.get("enable_control", False),
+        gest_cfg.get("enable_dispatch", False),
         gest_cfg.get("cooldown", 2.0)
     )
 
@@ -122,7 +122,7 @@ def main():
 
                     # Dispatch
                     if dispatcher:
-                        dispatcher.process(keypoint_classifier_labels[hand_sign_id])
+                        dispatcher.process(hand_sign_id)
 
             # Update Stats
             h, w = debug_image.shape[:2]
