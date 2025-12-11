@@ -149,7 +149,7 @@ def process_frames(pipeline, align, depth_scale, depth_intrinsics):
             
             info_lines = []
             closest_obj_dist = float('inf')
-            closest_obj_info = "Niciun obiect detectat"
+            # closest_obj_info = "Niciun obiect detectat"
 
             if results:
                 for r in results:
@@ -205,17 +205,23 @@ def process_frames(pipeline, align, depth_scale, depth_intrinsics):
                         cv2.putText(color_image, text_label, (x1, y1 - 10), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
+                        # Print info for ALL objects
+                        print(f"Detected: {label} | Dist: {depth_Z:.2f}m | Size: {dim_text}")
+
                         # Actualizam informatiile pentru bara de sus (cel mai apropiat obiect)
                         if depth_Z > 0 and depth_Z < closest_obj_dist:
                             closest_obj_dist = depth_Z
-                            closest_obj_info = f"Cel mai apropiat: {label} la {depth_Z:.2f}m ({dim_text})"
+                            # closest_obj_info = f"Cel mai apropiat: {label} la {depth_Z:.2f}m ({dim_text})"
 
             # Afisam valorile si in consola daca am gasit ceva
-            if closest_obj_dist != float('inf'):
-                print(closest_obj_info)
-                info_lines = [closest_obj_info]
-            else:
-                info_lines = ["Cautare obiecte..."]
+            # if closest_obj_dist != float('inf'):
+            #     print(closest_obj_info)
+            #     info_lines = [closest_obj_info]
+            # else:
+            #     info_lines = ["Cautare obiecte..."]
+            
+            # Doar FPS in bara de sus
+            info_lines = []
 
             # Calcul FPS
             if DRAW_FPS:
@@ -248,7 +254,8 @@ def process_frames(pipeline, align, depth_scale, depth_intrinsics):
                 
                 # Concatenam orizontal si apoi redimensionam la dimensiunea de afisare
                 combined = np.hstack((color_image, depth_colormap_resized))
-                final_image = cv2.resize(combined, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
+                # final_image = cv2.resize(combined, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
+                final_image = combined # Keep full resolution (1280x480)
 
             # Redimensionam pentru afisare daca este necesar (pentru modurile single)
             if view_mode != 2:
