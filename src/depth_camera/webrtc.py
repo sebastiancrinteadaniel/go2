@@ -131,6 +131,8 @@ def main():
             
             # Draw results
             if results:
+                # Use plot() but we might want to customize it to match run.py style better
+                # For now, plot() is fine, but let's ensure we add the depth info cleanly
                 annotated_frame = results[0].plot()
                 
                 # Add depth info to annotated frame
@@ -142,11 +144,18 @@ def main():
                         
                         if 0 <= cx < width and 0 <= cy < height:
                             # Use depth_image (numpy) instead of depth_frame object
-                            # depth_image is uint16 (mm usually), multiply by scale to get meters
                             dist = depth_image[cy, cx] * depth_scale
+                            
+                            # Calculate real dimensions if possible (approximate without intrinsics here easily available)
+                            # In run.py we used intrinsics. Here we are inside the loop.
+                            # Let's just show distance for now to keep it simple and fast for dashboard
+                            
                             label = f"{dist:.2f}m"
+                            # Draw slightly larger text with background for visibility
+                            (w_text, h_text), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                            cv2.rectangle(annotated_frame, (x1, y1 - 25), (x1 + w_text, y1 - 5), (0, 0, 0), -1)
                             cv2.putText(annotated_frame, label, (x1, y1 - 10), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             else:
                 annotated_frame = color_image.copy()
             
@@ -170,7 +179,7 @@ def main():
                 "fps": fps_val,
                 "width": w,
                 "height": h,
-                "info": f"Objects: {num_objects} | Mode: RGB+Depth"
+                "info": f"Objects: {num_objects}"
             })
 
             # Stream
