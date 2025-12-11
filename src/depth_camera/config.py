@@ -11,8 +11,8 @@ CONFIG = {
 
     "depth_camera": {
         # RealSense stream settings
-        "width": 320,
-        "height": 240,
+        "width": 640,
+        "height": 480,
         "fps": 30,
         
         # Analysis settings
