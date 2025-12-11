@@ -116,19 +116,19 @@ templates = Jinja2Templates(directory=templates_dir)
 # The commands spawn local processes that read from the shared frame queue
 MODULES = {
     "yolo": {
-        "cmd": ["python3", "-m", "src.laptop_client.modules.yolo"],
+        "cmd": ["python3", "-m", "src.yolo.run"],
         "port": 8081,
         "name": "YOLO Object Detection",
         "description": "YOLOv8 running on your laptop GPU.",
     },
     "hand": {
-        "cmd": ["python3", "-m", "src.laptop_client.modules.hand"],
+        "cmd": ["python3", "-m", "src.hand_detection.run"],
         "port": 8082,
         "name": "Hand Detection",
         "description": "MediaPipe hand tracking on your laptop.",
     },
     "depth": {
-        "cmd": ["python3", "-m", "src.laptop_client.modules.depth"],
+        "cmd": ["python3", "-m", "src.depth_camera.run"],
         "port": 8083,
         "name": "Depth Camera",
         "description": "RealSense depth mapping with object distance.",

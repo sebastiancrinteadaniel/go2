@@ -61,6 +61,11 @@ def main():
 
     fps_val = 0.0
     prev_time = cv2.getTickCount()
+    
+    # Optimization variables
+    frame_count = 0
+    skip_frames = 2 # Run YOLO every 3 frames
+    last_results = None
 
     try:
         while True:
@@ -80,38 +85,61 @@ def main():
                 continue
                 
             color_image = np.asanyarray(color_frame.get_data())
+            depth_image = np.asanyarray(depth_frame.get_data())
             
-            # YOLO Inference
-            results = model(color_image, verbose=False)
+            # YOLO Inference (Optimized)
+            if frame_count % (skip_frames + 1) == 0:
+                results = model(color_image, verbose=False)
+                last_results = results
+            else:
+                results = last_results
+            
+            frame_count += 1
             
             # Draw results
-            annotated_frame = results[0].plot()
+            if results:
+                annotated_frame = results[0].plot()
+                
+                # Add depth info to annotated frame
+                for r in results:
+                    boxes = r.boxes
+                    for box in boxes:
+                        x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+                        
+                        if 0 <= cx < width and 0 <= cy < height:
+                            dist = depth_frame.get_distance(cx, cy)
+                            label = f"{dist:.2f}m"
+                            cv2.putText(annotated_frame, label, (x1, y1 - 10), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            else:
+                annotated_frame = color_image.copy()
+            
+            # Create Depth Map Visualization
+            depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+            
+            # Combine Side-by-Side (RGB + Depth)
+            # Resize to ensure they match (they should, but good practice)
+            if annotated_frame.shape[:2] != depth_colormap.shape[:2]:
+                depth_colormap = cv2.resize(depth_colormap, (annotated_frame.shape[1], annotated_frame.shape[0]))
+                
+            combined_frame = np.hstack((annotated_frame, depth_colormap))
+            
+            # Resize combined frame to reasonable streaming size if needed
+            # For now, we stream the full double-width image (1280x480)
             
             # Update Stats
-            h, w = annotated_frame.shape[:2]
+            h, w = combined_frame.shape[:2]
             num_objects = len(results[0].boxes) if results else 0
             streamer.update_stats({
                 "fps": fps_val,
                 "width": w,
                 "height": h,
-                "info": f"Objects: {num_objects}"
+                "info": f"Objects: {num_objects} | Mode: RGB+Depth"
             })
-            
-            # Calculate distances for detected objects
-            for r in results:
-                boxes = r.boxes
-                for box in boxes:
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
-                    
-                    if 0 <= cx < width and 0 <= cy < height:
-                        dist = depth_frame.get_distance(cx, cy)
-                        label = f"{dist:.2f}m"
-                        cv2.putText(annotated_frame, label, (x1, y1 - 10), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
             # Stream
-            streamer.put_frame(annotated_frame)
+            streamer.put_frame(combined_frame)
 
     except KeyboardInterrupt:
         pass

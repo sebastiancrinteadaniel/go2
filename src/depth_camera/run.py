@@ -72,6 +72,12 @@ def process_frames(pipeline, align, depth_scale, depth_intrinsics):
 
     # Initializare calculator FPS
     cvFpsCalc = CvFpsCalc(buffer_len=10)
+    
+    # Variabile pentru optimizare si vizualizare
+    frame_count = 0
+    skip_frames = 2  # Ruleaza YOLO la fiecare (skip_frames + 1) cadre
+    last_results = None
+    view_mode = 0  # 0: RGB, 1: Depth, 2: Side-by-Side
 
     try:
         while True:
@@ -87,17 +93,24 @@ def process_frames(pipeline, align, depth_scale, depth_intrinsics):
             color_image = np.asanyarray(color_frame.get_data())
             depth_image = np.asanyarray(depth_frame.get_data())
 
-            # --- DETECTIE OBIECTE CU YOLO ---
-            results = model(color_image, verbose=False)
+            # --- DETECTIE OBIECTE CU YOLO (Optimizat) ---
+            if frame_count % (skip_frames + 1) == 0:
+                results = model(color_image, verbose=False)
+                last_results = results
+            else:
+                results = last_results
+            
+            frame_count += 1
             
             info_lines = []
             closest_obj_dist = float('inf')
             closest_obj_info = "Niciun obiect detectat"
 
-            for r in results:
-                boxes = r.boxes
-                for box in boxes:
-                    # Coordonate Bounding Box
+            if results:
+                for r in results:
+                    boxes = r.boxes
+                    for box in boxes:
+                        # Coordonate Bounding Box
                     x1, y1, x2, y2 = box.xyxy[0]
                     x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
                     
@@ -164,18 +177,46 @@ def process_frames(pipeline, align, depth_scale, depth_intrinsics):
                 fps = cvFpsCalc.get()
                 info_lines.append(f"FPS: {fps:.1f}")
 
-            # --- VIZUALIZARE GENERALĂ (Fereastra 1: RGB cu Overlay) ---
+            # --- VIZUALIZARE GENERALĂ ---
             
-            # Folosim draw_info_fps pentru a desena bara neagra sus cu informatiile
+            # Pregatire Depth Map pentru vizualizare
+            # Scalam valorile pentru a fi vizibile (alpha=0.03 este aproximativ 255/8000mm)
+            depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+            
+            # Desenam info pe RGB
             color_image = draw_info_fps(color_image, info_lines)
             
-            # Redimensionam pentru afisare daca este necesar
-            color_image = resize_for_display(color_image, DISPLAY_WIDTH, DISPLAY_HEIGHT)
+            # Selectie imagine de afisat
+            final_image = None
+            
+            if view_mode == 0: # RGB
+                final_image = color_image
+            elif view_mode == 1: # Depth
+                # Adaugam info si pe depth map
+                depth_colormap = draw_info_fps(depth_colormap, info_lines + ["Mod: Depth Map"])
+                final_image = depth_colormap
+            elif view_mode == 2: # Side-by-Side
+                # Redimensionam ambele la jumatate din latime pentru a incapea
+                h, w = color_image.shape[:2]
+                # Asiguram ca au aceeasi dimensiune
+                depth_colormap_resized = cv2.resize(depth_colormap, (w, h))
+                
+                # Concatenam orizontal si apoi redimensionam la dimensiunea de afisare
+                combined = np.hstack((color_image, depth_colormap_resized))
+                final_image = cv2.resize(combined, (DISPLAY_WIDTH, DISPLAY_HEIGHT))
 
-            cv2.imshow(WINDOW_NAME, color_image)
+            # Redimensionam pentru afisare daca este necesar (pentru modurile single)
+            if view_mode != 2:
+                final_image = resize_for_display(final_image, DISPLAY_WIDTH, DISPLAY_HEIGHT)
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            cv2.imshow(WINDOW_NAME, final_image)
+
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
                 break
+            elif key == ord('d'): # Toggle view mode
+                view_mode = (view_mode + 1) % 3
+                print(f"Schimbare mod vizualizare: {view_mode}")
 
     finally:
         pipeline.stop()
