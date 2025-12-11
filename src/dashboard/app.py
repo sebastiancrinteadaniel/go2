@@ -101,7 +101,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    manager.stop_all()
+    await manager.stop_all()
     if SDK_AVAILABLE:
         telemetry.stop()
 

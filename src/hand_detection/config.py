@@ -26,7 +26,7 @@ CONFIG = {
     },
     "gestures": {
         # Enable dispatching gestures to a Unitree SportClient (GO2)
-        "enable_dispatch": False,
+        "enable_dispatch": True,
         # Cooldown seconds between repeated dispatches of the same gesture
         "cooldown": 2.0,
     },

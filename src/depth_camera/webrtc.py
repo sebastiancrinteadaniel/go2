@@ -1,4 +1,7 @@
 import logging
+import threading
+import queue
+import time
 
 import cv2
 import numpy as np
@@ -10,6 +13,36 @@ from .config import CONFIG
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def frame_reader_thread(pipeline, align, frame_queue, stop_event):
+    """Reads frames from RealSense in a separate thread."""
+    while not stop_event.is_set():
+        try:
+            frames = pipeline.wait_for_frames(timeout_ms=1000)
+            aligned_frames = align.process(frames)
+            
+            depth_frame = aligned_frames.get_depth_frame()
+            color_frame = aligned_frames.get_color_frame()
+            
+            if not depth_frame or not color_frame:
+                continue
+                
+            depth_image = np.asanyarray(depth_frame.get_data())
+            color_image = np.asanyarray(color_frame.get_data())
+            
+            if frame_queue.full():
+                try:
+                    frame_queue.get_nowait()
+                except queue.Empty:
+                    pass
+            
+            frame_queue.put((depth_image, color_image))
+            
+        except RuntimeError:
+            continue
+        except Exception as e:
+            logger.error(f"Frame reader error: {e}")
+            break
 
 def initialize_realsense(width, height, fps):
     pipeline = rs.pipeline()
@@ -67,26 +100,26 @@ def main():
     skip_frames = 2 # Run YOLO every 3 frames
     last_results = None
 
+    # Start frame reader thread
+    frame_queue = queue.Queue(maxsize=1)
+    stop_event = threading.Event()
+    reader_thread = threading.Thread(target=frame_reader_thread, 
+                                   args=(pipeline, align, frame_queue, stop_event))
+    reader_thread.daemon = True
+    reader_thread.start()
+
     try:
         while True:
-            frames = pipeline.wait_for_frames()
+            try:
+                depth_image, color_image = frame_queue.get(timeout=1.0)
+            except queue.Empty:
+                continue
             
             curr_time = cv2.getTickCount()
             time_diff = (curr_time - prev_time) / cv2.getTickFrequency()
             prev_time = curr_time
             fps_val = 1.0 / max(1e-6, time_diff)
 
-            aligned_frames = align.process(frames)
-            
-            depth_frame = aligned_frames.get_depth_frame()
-            color_frame = aligned_frames.get_color_frame()
-            
-            if not depth_frame or not color_frame:
-                continue
-                
-            color_image = np.asanyarray(color_frame.get_data())
-            depth_image = np.asanyarray(depth_frame.get_data())
-            
             # YOLO Inference (Optimized)
             if frame_count % (skip_frames + 1) == 0:
                 results = model(color_image, verbose=False)
@@ -108,7 +141,9 @@ def main():
                         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
                         
                         if 0 <= cx < width and 0 <= cy < height:
-                            dist = depth_frame.get_distance(cx, cy)
+                            # Use depth_image (numpy) instead of depth_frame object
+                            # depth_image is uint16 (mm usually), multiply by scale to get meters
+                            dist = depth_image[cy, cx] * depth_scale
                             label = f"{dist:.2f}m"
                             cv2.putText(annotated_frame, label, (x1, y1 - 10), 
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
@@ -146,6 +181,7 @@ def main():
     except Exception as e:
         logger.error(f"Runtime error: {e}")
     finally:
+        stop_event.set()
         streamer.stop()
         pipeline.stop()
 

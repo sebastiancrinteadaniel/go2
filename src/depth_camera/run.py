@@ -1,6 +1,9 @@
 import pyrealsense2 as rs
 import numpy as np
 import cv2
+import threading
+import queue
+import time
 from ultralytics import YOLO
 
 
@@ -59,6 +62,46 @@ def initialize_realsense():
 
     return pipeline, align, depth_scale, depth_intrinsics
 
+
+def frame_reader_thread(pipeline, align, frame_queue, stop_event):
+    """Reads frames from RealSense in a separate thread to prevent buffer overflow."""
+    while not stop_event.is_set():
+        try:
+            # Wait for frames with a short timeout to allow checking stop_event
+            frames = pipeline.wait_for_frames(timeout_ms=1000)
+            
+            # Align frames (this is CPU intensive, but better done here than blocking main loop?)
+            # Actually, if we do it here, we might drop frames if alignment is slow.
+            # But if we don't do it here, we pass unaligned frames.
+            # Let's try doing it here.
+            aligned_frames = align.process(frames)
+            
+            depth_frame = aligned_frames.get_depth_frame()
+            color_frame = aligned_frames.get_color_frame()
+            
+            if not depth_frame or not color_frame:
+                continue
+                
+            # Convert to numpy arrays immediately to release RS frame references
+            depth_image = np.asanyarray(depth_frame.get_data())
+            color_image = np.asanyarray(color_frame.get_data())
+            
+            # Put in queue, replacing old frame if full (always keep latest)
+            if frame_queue.full():
+                try:
+                    frame_queue.get_nowait()
+                except queue.Empty:
+                    pass
+            
+            frame_queue.put((depth_image, color_image))
+            
+        except RuntimeError:
+            # Timeout or other RS error
+            continue
+        except Exception as e:
+            print(f"Frame reader error: {e}")
+            break
+
 def process_frames(pipeline, align, depth_scale, depth_intrinsics):
     """Procesează cadrele și calculează distanța și mărimea obiectului în ROI, afișând mai multe vizualizări."""
     
@@ -77,21 +120,23 @@ def process_frames(pipeline, align, depth_scale, depth_intrinsics):
     frame_count = 0
     skip_frames = 2  # Ruleaza YOLO la fiecare (skip_frames + 1) cadre
     last_results = None
-    view_mode = 0  # 0: RGB, 1: Depth, 2: Side-by-Side
+    view_mode = 2  # 0: RGB, 1: Depth, 2: Side-by-Side (Default)
+
+    # Start frame reader thread
+    frame_queue = queue.Queue(maxsize=1)
+    stop_event = threading.Event()
+    reader_thread = threading.Thread(target=frame_reader_thread, 
+                                   args=(pipeline, align, frame_queue, stop_event))
+    reader_thread.daemon = True
+    reader_thread.start()
 
     try:
         while True:
-            frames = pipeline.wait_for_frames()
-            aligned_frames = align.process(frames)
-
-            depth_frame = aligned_frames.get_depth_frame()
-            color_frame = aligned_frames.get_color_frame()
-
-            if not depth_frame or not color_frame:
+            try:
+                # Get latest frame from queue
+                depth_image, color_image = frame_queue.get(timeout=1.0)
+            except queue.Empty:
                 continue
-
-            color_image = np.asanyarray(color_frame.get_data())
-            depth_image = np.asanyarray(depth_frame.get_data())
 
             # --- DETECTIE OBIECTE CU YOLO (Optimizat) ---
             if frame_count % (skip_frames + 1) == 0:
@@ -219,6 +264,7 @@ def process_frames(pipeline, align, depth_scale, depth_intrinsics):
                 print(f"Schimbare mod vizualizare: {view_mode}")
 
     finally:
+        stop_event.set()
         pipeline.stop()
         cv2.destroyAllWindows()
 
