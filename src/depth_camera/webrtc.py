@@ -151,13 +151,6 @@ def main():
                             # Let's just show distance for now to keep it simple and fast for dashboard
                             
                             label = f"{dist:.2f}m"
-                            
-                            # Print detection info to terminal (like run.py)
-                            # We don't have full dimensions here easily without intrinsics, but we show distance
-                            cls = int(box.cls[0])
-                            obj_name = model.names[cls]
-                            print(f"Detected: {obj_name} | Dist: {dist:.2f}m")
-
                             # Draw slightly larger text with background for visibility
                             (w_text, h_text), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
                             cv2.rectangle(annotated_frame, (x1, y1 - 25), (x1 + w_text, y1 - 5), (0, 0, 0), -1)
