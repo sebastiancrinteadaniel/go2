@@ -111,59 +111,59 @@ def process_frames(pipeline, align, depth_scale, depth_intrinsics):
                     boxes = r.boxes
                     for box in boxes:
                         # Coordonate Bounding Box
-                    x1, y1, x2, y2 = box.xyxy[0]
-                    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-                    
-                    # Clasa si incredere
-                    cls = int(box.cls[0])
-                    conf = float(box.conf[0])
-                    label = model.names[cls]
-
-                    # --- CALCUL ADANCIME PENTRU OBIECTUL CURENT ---
-                    # Extragem ROI din depth map pentru acest obiect
-                    # Ne asiguram ca coordonatele sunt in limitele imaginii
-                    x1_c = max(0, x1)
-                    y1_c = max(0, y1)
-                    x2_c = min(WIDTH, x2)
-                    y2_c = min(HEIGHT, y2)
-
-                    obj_depth_roi = depth_image[y1_c:y2_c, x1_c:x2_c]
-                    
-                    # Filtram valorile 0
-                    valid_depths = obj_depth_roi[obj_depth_roi > 0]
-                    
-                    if valid_depths.size > 0:
-                        depth_Z = np.median(valid_depths) * depth_scale
-                    else:
-                        depth_Z = 0
-
-                    # --- CALCUL DIMENSIUNI REALE ---
-                    if depth_Z > 0:
-                        # Punctele 3D pentru colturile bounding box-ului
-                        # Folosim centrul bounding box-ului pentru Z, dar colturile 2D pentru X,Y
-                        point3D_TL = rs.rs2_deproject_pixel_to_point(depth_intrinsics, [x1, y1], depth_Z)
-                        point3D_BR = rs.rs2_deproject_pixel_to_point(depth_intrinsics, [x2, y2], depth_Z)
+                        x1, y1, x2, y2 = box.xyxy[0]
+                        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
                         
-                        width_m = abs(point3D_BR[0] - point3D_TL[0])
-                        height_m = abs(point3D_BR[1] - point3D_TL[1])
+                        # Clasa si incredere
+                        cls = int(box.cls[0])
+                        conf = float(box.conf[0])
+                        label = model.names[cls]
+
+                        # --- CALCUL ADANCIME PENTRU OBIECTUL CURENT ---
+                        # Extragem ROI din depth map pentru acest obiect
+                        # Ne asiguram ca coordonatele sunt in limitele imaginii
+                        x1_c = max(0, x1)
+                        y1_c = max(0, y1)
+                        x2_c = min(WIDTH, x2)
+                        y2_c = min(HEIGHT, y2)
+
+                        obj_depth_roi = depth_image[y1_c:y2_c, x1_c:x2_c]
                         
-                        dim_text = f"{width_m:.2f}m x {height_m:.2f}m"
-                    else:
-                        dim_text = "N/A"
+                        # Filtram valorile 0
+                        valid_depths = obj_depth_roi[obj_depth_roi > 0]
+                        
+                        if valid_depths.size > 0:
+                            depth_Z = np.median(valid_depths) * depth_scale
+                        else:
+                            depth_Z = 0
 
-                    # --- DESENARE PE IMAGINE ---
-                    # Dreptunghi
-                    cv2.rectangle(color_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    
-                    # Text deasupra cutiei
-                    text_label = f"{label} {conf:.2f} | Z: {depth_Z:.2f}m | {dim_text}"
-                    cv2.putText(color_image, text_label, (x1, y1 - 10), 
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                        # --- CALCUL DIMENSIUNI REALE ---
+                        if depth_Z > 0:
+                            # Punctele 3D pentru colturile bounding box-ului
+                            # Folosim centrul bounding box-ului pentru Z, dar colturile 2D pentru X,Y
+                            point3D_TL = rs.rs2_deproject_pixel_to_point(depth_intrinsics, [x1, y1], depth_Z)
+                            point3D_BR = rs.rs2_deproject_pixel_to_point(depth_intrinsics, [x2, y2], depth_Z)
+                            
+                            width_m = abs(point3D_BR[0] - point3D_TL[0])
+                            height_m = abs(point3D_BR[1] - point3D_TL[1])
+                            
+                            dim_text = f"{width_m:.2f}m x {height_m:.2f}m"
+                        else:
+                            dim_text = "N/A"
 
-                    # Actualizam informatiile pentru bara de sus (cel mai apropiat obiect)
-                    if depth_Z > 0 and depth_Z < closest_obj_dist:
-                        closest_obj_dist = depth_Z
-                        closest_obj_info = f"Cel mai apropiat: {label} la {depth_Z:.2f}m ({dim_text})"
+                        # --- DESENARE PE IMAGINE ---
+                        # Dreptunghi
+                        cv2.rectangle(color_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        
+                        # Text deasupra cutiei
+                        text_label = f"{label} {conf:.2f} | Z: {depth_Z:.2f}m | {dim_text}"
+                        cv2.putText(color_image, text_label, (x1, y1 - 10), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+                        # Actualizam informatiile pentru bara de sus (cel mai apropiat obiect)
+                        if depth_Z > 0 and depth_Z < closest_obj_dist:
+                            closest_obj_dist = depth_Z
+                            closest_obj_info = f"Cel mai apropiat: {label} la {depth_Z:.2f}m ({dim_text})"
 
             # Afisam valorile si in consola daca am gasit ceva
             if closest_obj_dist != float('inf'):
