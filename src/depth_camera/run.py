@@ -172,7 +172,24 @@ def process_frames(pipeline, align, depth_scale, depth_intrinsics):
                         x2_c = min(WIDTH, x2)
                         y2_c = min(HEIGHT, y2)
 
-                        obj_depth_roi = depth_image[y1_c:y2_c, x1_c:x2_c]
+                        # OPTIMIZARE: Folosim doar centrul ROI-ului pentru calculul medianei
+                        # Calcularea medianei pe tot bounding box-ul este foarte lenta pentru obiecte mari
+                        roi_h = y2_c - y1_c
+                        roi_w = x2_c - x1_c
+                        
+                        # Luam un crop de maxim 40x40 pixeli din centru (sau 20% din dimensiune)
+                        crop_h = min(40, max(4, int(roi_h * 0.2)))
+                        crop_w = min(40, max(4, int(roi_w * 0.2)))
+                        
+                        cx_roi = (x1_c + x2_c) // 2
+                        cy_roi = (y1_c + y2_c) // 2
+                        
+                        start_y = max(y1_c, cy_roi - crop_h // 2)
+                        end_y = min(y2_c, start_y + crop_h)
+                        start_x = max(x1_c, cx_roi - crop_w // 2)
+                        end_x = min(x2_c, start_x + crop_w)
+                        
+                        obj_depth_roi = depth_image[start_y:end_y, start_x:end_x]
                         
                         # Filtram valorile 0
                         valid_depths = obj_depth_roi[obj_depth_roi > 0]

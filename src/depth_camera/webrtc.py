@@ -142,12 +142,36 @@ def main():
                         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
                         
                         if 0 <= cx < width and 0 <= cy < height:
-                            # Use depth_image (numpy) instead of depth_frame object
-                            dist = depth_image[cy, cx] * depth_scale
+                            # OPTIMIZATION: Use center crop for median calculation
+                            # Full ROI median is too slow for large objects (blocking)
+                            # Single pixel is too noisy
                             
-                            # Calculate real dimensions if possible (approximate without intrinsics here easily available)
-                            # In run.py we used intrinsics. Here we are inside the loop.
-                            # Let's just show distance for now to keep it simple and fast for dashboard
+                            # Ensure coordinates are within bounds
+                            x1_c, y1_c = max(0, x1), max(0, y1)
+                            x2_c, y2_c = min(width, x2), min(height, y2)
+                            
+                            roi_h = y2_c - y1_c
+                            roi_w = x2_c - x1_c
+                            
+                            # Crop size: max 40x40, min 4x4, or 20% of ROI
+                            crop_h = min(40, max(4, int(roi_h * 0.2)))
+                            crop_w = min(40, max(4, int(roi_w * 0.2)))
+                            
+                            cx_roi = (x1_c + x2_c) // 2
+                            cy_roi = (y1_c + y2_c) // 2
+                            
+                            start_y = max(y1_c, cy_roi - crop_h // 2)
+                            end_y = min(y2_c, start_y + crop_h)
+                            start_x = max(x1_c, cx_roi - crop_w // 2)
+                            end_x = min(x2_c, start_x + crop_w)
+                            
+                            obj_depth_roi = depth_image[start_y:end_y, start_x:end_x]
+                            valid_depths = obj_depth_roi[obj_depth_roi > 0]
+                            
+                            if valid_depths.size > 0:
+                                dist = np.median(valid_depths) * depth_scale
+                            else:
+                                dist = 0.0
                             
                             label = f"{dist:.2f}m"
                             # Draw slightly larger text with background for visibility
