@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Jetson Nano Dashboard</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        text-align: center;
+        background: #1a1a1a;
+        color: white;
+      }
+      video {
+        width: 80%;
+        max-width: 800px;
+        border: 2px solid #444;
+        border-radius: 8px;
+      }
+      .controls {
+        margin-top: 20px;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        border-radius: 5px;
+        border: none;
+        background: #007bff;
+        color: white;
+        margin: 5px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Jetson Live Feed</h1>
+    <video id="video" autoplay playsinline></video>
+
+    <div class="controls">
+      <button onclick="alert('Action 1 Triggered')">Move Left</button>
+      <button onclick="alert('Action 2 Triggered')">Move Right</button>
+      <button onclick="startStream()">Connect Camera</button>
+    </div>
+
+    <script>
+      const pc = new RTCPeerConnection();
+
+      async function startStream() {
+        pc.ontrack = (event) => {
+          document.getElementById("video").srcObject = event.streams[0];
+        };
+
+        // Create placeholder track to trigger negotiation
+        pc.addTransceiver("video", { direction: "recvonly" });
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        const response = await fetch("/offer", {
+          method: "POST",
+          body: JSON.stringify({
+            sdp: pc.localDescription.sdp,
+            type: pc.localDescription.type,
+          }),
+          headers: { "Content-Type": "application/json" },
+        });
+
+        const answer = await response.json();
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      }
+    </script>
+  </body>
+</html>

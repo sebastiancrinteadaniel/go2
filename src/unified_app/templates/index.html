@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unified Go2 Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #f0f0f0;
+            min-height: 100vh;
+        }
+
+        header {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            border-bottom: 3px solid #00d4ff;
+        }
+
+        header h1 {
+            color: #00d4ff;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            font-size: 14px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-label {
+            color: #aaa;
+        }
+
+        .stat-value {
+            color: #00d4ff;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .container {
+            display: flex;
+            height: calc(100vh - 100px);
+            gap: 20px;
+            padding: 20px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            padding: 20px;
+            overflow-y: auto;
+            border: 2px solid rgba(0, 212, 255, 0.3);
+        }
+
+        .sidebar h2 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 2px solid #00d4ff;
+            padding-bottom: 10px;
+        }
+
+        .processor-control {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .processor-control:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(0, 212, 255, 0.5);
+        }
+
+        .processor-name {
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .processor-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff6b6b;
+        }
+
+        .status-indicator.running {
+            background: #51cf66;
+            box-shadow: 0 0 8px #51cf66;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+
+        .btn-start {
+            background: #51cf66;
+            color: #000;
+        }
+
+        .btn-start:hover {
+            background: #40c057;
+            box-shadow: 0 4px 8px rgba(81, 207, 102, 0.3);
+        }
+
+        .btn-stop {
+            background: #ff6b6b;
+            color: #fff;
+        }
+
+        .btn-stop:hover {
+            background: #ff5252;
+            box-shadow: 0 4px 8px rgba(255, 107, 107, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 15px;
+            flex: 1;
+        }
+
+        .video-card {
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(0, 212, 255, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+
+        .video-card:hover {
+            border-color: rgba(0, 212, 255, 0.6);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+        }
+
+        .video-card.inactive {
+            opacity: 0.5;
+            border-color: rgba(255, 107, 107, 0.2);
+        }
+
+        .video-header {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+        }
+
+        .video-title {
+            color: #00d4ff;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .video-stream {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            min-height: 240px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .video-stream img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .stream-placeholder {
+            color: #666;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        /* Logs Panel */
+        .logs-panel {
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(0, 212, 255, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .logs-panel h3 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+        }
+
+        .log-entry {
+            color: #a0a0a0;
+            margin-bottom: 5px;
+            padding: 3px 0;
+            border-left: 2px solid transparent;
+            padding-left: 8px;
+        }
+
+        .log-entry.info {
+            color: #00d4ff;
+            border-left-color: #00d4ff;
+        }
+
+        .log-entry.error {
+            color: #ff6b6b;
+            border-left-color: #ff6b6b;
+        }
+
+        .log-entry.success {
+            color: #51cf66;
+            border-left-color: #51cf66;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 212, 255, 0.5);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 212, 255, 0.8);
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .loading {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                max-height: 200px;
+            }
+
+            .video-grid {
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🤖 Unified Go2 Dashboard</h1>
+        <div class="stats-bar">
+            <div class="stat-item">
+                <span class="stat-label">Status:</span>
+                <span class="stat-value" id="status">Connecting...</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Processors:</span>
+                <span class="stat-value" id="processor-count">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Frames:</span>
+                <span class="stat-value" id="frame-count">0</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <h2>Processors</h2>
+            <div id="processor-list"></div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="video-grid" id="video-grid"></div>
+            <div class="logs-panel">
+                <h3>System Log</h3>
+                <div id="logs"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ====================================================================
+        // Global State
+        // ====================================================================
+
+        const state = {
+            processors: {},
+            lastFrameCount: 0,
+        };
+
+        // ====================================================================
+        // API Communication
+        // ====================================================================
+
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            try {
+                const options = {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                };
+
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
+
+                const response = await fetch(endpoint, options);
+
+                if (!response.ok && response.status !== 404) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error(`API Error [${endpoint}]:`, error);
+                return null;
+            }
+        }
+
+        // ====================================================================
+        // UI Updates
+        // ====================================================================
+
+        function addLog(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+
+            logsDiv.appendChild(entry);
+
+            // Keep only last 50 logs
+            while (logsDiv.children.length > 50) {
+                logsDiv.removeChild(logsDiv.firstChild);
+            }
+
+            // Auto-scroll
+            logsDiv.parentElement.scrollTop = logsDiv.parentElement.scrollHeight;
+        }
+
+        async function updateProcessorList() {
+            const processors = await apiCall('/api/processors');
+
+            if (!processors) {
+                document.getElementById('status').textContent = 'Error';
+                document.getElementById('status').style.color = '#ff6b6b';
+                return;
+            }
+
+            document.getElementById('status').textContent = 'Connected';
+            document.getElementById('status').style.color = '#51cf66';
+            document.getElementById('processor-count').textContent = processors.length;
+
+            // Update sidebar
+            const processorList = document.getElementById('processor-list');
+            processorList.innerHTML = '';
+
+            for (const processor of processors) {
+                state.processors[processor.id] = processor;
+
+                const div = document.createElement('div');
+                div.className = 'processor-control';
+                div.innerHTML = `
+                    <div class="processor-name">${processor.name}</div>
+                    <div class="processor-status">
+                        <div class="status-indicator ${processor.running ? 'running' : ''}"></div>
+                        <span>${processor.running ? 'Running' : 'Stopped'}</span>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn btn-start" onclick="startProcessor('${processor.id}')" 
+                                ${processor.running ? 'disabled' : ''}>Start</button>
+                        <button class="btn btn-stop" onclick="stopProcessor('${processor.id}')" 
+                                ${!processor.running ? 'disabled' : ''}>Stop</button>
+                    </div>
+                `;
+                processorList.appendChild(div);
+            }
+
+            // Update video grid
+            updateVideoGrid(processors);
+        }
+
+        function updateVideoGrid(processors) {
+            const grid = document.getElementById('video-grid');
+            grid.innerHTML = '';
+
+            for (const processor of processors) {
+                const card = document.createElement('div');
+                card.className = `video-card ${!processor.running ? 'inactive' : ''}`;
+
+                const header = document.createElement('div');
+                header.className = 'video-header';
+                header.innerHTML = `
+                    <div class="video-title">${processor.name}</div>
+                `;
+
+                // Add tabs for MJPEG vs WebRTC
+                const tabs = document.createElement('div');
+                tabs.className = 'stream-tabs';
+                tabs.style.display = 'flex';
+                tabs.style.gap = '5px';
+                tabs.style.padding = '8px';
+                tabs.style.background = 'rgba(0,0,0,0.5)';
+                tabs.style.borderBottom = '1px solid rgba(0, 212, 255, 0.2)';
+                
+                const mjpegTab = document.createElement('button');
+                mjpegTab.textContent = 'MJPEG';
+                mjpegTab.style.cssText = 'flex:1;padding:6px 10px;background:#00d4ff;color:#000;border:none;border-radius:4px;cursor:pointer;font-weight:bold;font-size:12px;';
+                mjpegTab.className = 'stream-tab active';
+                mjpegTab.dataset.processor = processor.id;
+                mjpegTab.dataset.type = 'mjpeg';
+                
+                const webrtcTab = document.createElement('button');
+                webrtcTab.textContent = 'WebRTC';
+                webrtcTab.style.cssText = 'flex:1;padding:6px 10px;background:#666;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;font-size:12px;';
+                webrtcTab.className = 'stream-tab';
+                webrtcTab.dataset.processor = processor.id;
+                webrtcTab.dataset.type = 'webrtc';
+                
+                // Tab switching
+                mjpegTab.onclick = () => switchStreamType(processor.id, 'mjpeg', mjpegTab, webrtcTab);
+                webrtcTab.onclick = () => switchStreamType(processor.id, 'webrtc', mjpegTab, webrtcTab);
+                
+                tabs.appendChild(mjpegTab);
+                tabs.appendChild(webrtcTab);
+
+                const stream = document.createElement('div');
+                stream.className = 'video-stream';
+                stream.id = `stream-${processor.id}`;
+
+                if (processor.running) {
+                    const img = document.createElement('img');
+                    img.id = `img-${processor.id}`;
+                    img.src = `/api/streams/${processor.id}/video_feed`;
+                    img.alt = processor.name;
+                    img.onerror = () => {
+                        stream.innerHTML = '<div class="stream-placeholder">Stream unavailable</div>';
+                    };
+                    stream.appendChild(img);
+                } else {
+                    stream.innerHTML = '<div class="stream-placeholder">Stream disabled</div>';
+                }
+
+                card.appendChild(header);
+                card.appendChild(tabs);
+                card.appendChild(stream);
+                grid.appendChild(card);
+            }
+        }
+
+        async function switchStreamType(processorId, type, mjpegTab, webrtcTab) {
+            const streamDiv = document.getElementById(`stream-${processorId}`);
+            
+            // Update tab styles
+            if (type === 'mjpeg') {
+                mjpegTab.style.background = '#00d4ff';
+                mjpegTab.style.color = '#000';
+                webrtcTab.style.background = '#666';
+                webrtcTab.style.color = '#fff';
+                
+                // Show MJPEG
+                streamDiv.innerHTML = '';
+                const img = document.createElement('img');
+                img.id = `img-${processorId}`;
+                img.src = `/api/streams/${processorId}/video_feed`;
+                img.alt = processorId;
+                img.style.maxWidth = '100%';
+                img.style.maxHeight = '100%';
+                img.style.objectFit = 'contain';
+                streamDiv.appendChild(img);
+            } else if (type === 'webrtc') {
+                mjpegTab.style.background = '#666';
+                mjpegTab.style.color = '#fff';
+                webrtcTab.style.background = '#00d4ff';
+                webrtcTab.style.color = '#000';
+                
+                // Show WebRTC
+                streamDiv.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:#000;"><video id="video-webrtc-' + processorId + '" style="width:100%;height:100%;background:#000;" autoplay playsinline></video></div>';
+                
+                try {
+                    addLog(`Starting WebRTC for ${processorId}...`, 'info');
+                    await startWebRTCStream(processorId);
+                    addLog(`WebRTC connected for ${processorId}`, 'success');
+                } catch (e) {
+                    console.error('WebRTC error:', e);
+                    addLog(`WebRTC error for ${processorId}: ${e.message}`, 'error');
+                    streamDiv.innerHTML = '<div class="stream-placeholder">WebRTC unavailable - install: pip install aiortc av</div>';
+                }
+            }
+        }
+
+        async function startWebRTCStream(processorId) {
+            const pc = new RTCPeerConnection();
+            const videoElement = document.getElementById('video-webrtc-' + processorId);
+            
+            pc.ontrack = (event) => {
+                console.log('WebRTC track received:', event.track.kind);
+                videoElement.srcObject = event.streams[0];
+            };
+
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log('ICE candidate:', event.candidate);
+                }
+            };
+
+            pc.onconnectionstatechange = () => {
+                console.log('WebRTC connection state:', pc.connectionState);
+            };
+
+            // Request video from server
+            pc.addTransceiver('video', { direction: 'recvonly' });
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            const response = await fetch('/api/webrtc/offer', {
+                method: 'POST',
+                body: JSON.stringify({
+                    sdp: pc.localDescription.sdp,
+                    type: pc.localDescription.type,
+                    processor: processorId
+                }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+            }
+
+            const answer = await response.json();
+            await pc.setRemoteDescription(new RTCSessionDescription(answer));
+            
+            console.log('WebRTC connection established for:', processorId);
+        }
+
+        async function updateStats() {
+            const stats = await apiCall('/api/stats');
+
+            if (stats && stats.frame_router) {
+                const frameCount = stats.frame_router.frame_count || 0;
+                document.getElementById('frame-count').textContent = frameCount;
+
+                if (frameCount !== state.lastFrameCount) {
+                    state.lastFrameCount = frameCount;
+                }
+            }
+        }
+
+        // ====================================================================
+        // Processor Control
+        // ====================================================================
+
+        async function startProcessor(processorId) {
+            addLog(`Starting ${processorId}...`, 'info');
+
+            const result = await apiCall(`/api/processors/${processorId}/start`, 'POST');
+
+            if (result && result.status === 'started') {
+                addLog(`${processorId} started successfully`, 'success');
+                await updateProcessorList();
+            } else {
+                addLog(`Failed to start ${processorId}`, 'error');
+            }
+        }
+
+        async function stopProcessor(processorId) {
+            addLog(`Stopping ${processorId}...`, 'info');
+
+            const result = await apiCall(`/api/processors/${processorId}/stop`, 'POST');
+
+            if (result && result.status === 'stopped') {
+                addLog(`${processorId} stopped successfully`, 'success');
+                await updateProcessorList();
+            } else {
+                addLog(`Failed to stop ${processorId}`, 'error');
+            }
+        }
+
+        // ====================================================================
+        // Initialization & Main Loop
+        // ====================================================================
+
+        async function initialize() {
+            addLog('Initializing dashboard...', 'info');
+
+            await updateProcessorList();
+            addLog('Dashboard initialized', 'success');
+
+            // Start refresh loop
+            setInterval(async () => {
+                await updateProcessorList();
+                await updateStats();
+            }, 2000);
+        }
+
+        // Start on page load
+        window.addEventListener('load', initialize);
+    </script>
+</body>
+</html>
