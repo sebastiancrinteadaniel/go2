@@ -688,6 +688,7 @@ body {
     gap: 2rem;
     align-items: center;
     margin-left: 2rem;
+    flex: 1;
 }
 
 .btm-telem-item {
