@@ -1,0 +1,12 @@
+[project]
+name = "c2-go2"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "aiortc>=1.14.0",
+    "av>=16.1.0",
+    "fastapi[all]>=0.135.1",
+    "opencv-python>=4.13.0.92",
+]
