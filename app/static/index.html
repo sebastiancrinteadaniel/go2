@@ -28,17 +28,21 @@
         </div>
         <div class="telemetry-item">
           <span class="label">CONNECTION</span>
-          <span class="val accent-green">
-            <span class="signal-icon"></span> 98 ms
+          <span class="val accent-green" id="sys-connection-wrapper" style="gap: 0.4rem;">
+            <img src="/static/icons/connection.svg" alt="Connection" style="width: 16px; height: 16px;" onerror="this.style.display = 'none'" /> <span id="sys-connection">-- ms</span>
           </span>
         </div>
         <div class="telemetry-item">
           <span class="label">TELEMETRY</span>
-          <span class="val">5.2 GHz</span>
+          <span class="val" id="sys-telemetry-wrapper" style="color: var(--accent-blue); gap: 0.4rem;">
+            <img src="/static/icons/telemetry.svg" alt="Telemetry" style="width: 16px; height: 16px;" onerror="this.style.display = 'none'" /> <span id="sys-telemetry">-- GHz</span>
+          </span>
         </div>
         <div class="telemetry-item">
           <span class="label">POWER</span>
-          <span class="val accent-yellow">84%</span>
+          <span class="val accent-yellow" style="gap: 0.4rem;">
+            <img src="/static/icons/power.svg" alt="Power" style="width: 16px; height: 16px;" onerror="this.style.display = 'none'" /> <span id="sys-battery">84%</span>
+          </span>
         </div>
         <div class="telemetry-item">
           <span class="label">CPU</span>
@@ -50,7 +54,9 @@
         </div>
         <div class="telemetry-item">
           <span class="label">UPTIME</span>
-          <span class="val" id="sys-uptime">--:--:--</span>
+          <span class="val" style="gap: 0.4rem;">
+            <img src="/static/icons/uptime.svg" alt="Uptime" style="width: 16px; height: 16px;" onerror="this.style.display = 'none'" /> <span id="sys-uptime">--:--:--</span>
+          </span>
         </div>
       </div>
     </header>
@@ -98,10 +104,13 @@
             </div>
 
             <!-- Expand icon (Bottom right) -->
-            <div class="video-expand">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" stroke="#8b95a5" stroke-width="2"
-                  stroke-linecap="round" stroke-linejoin="round" />
+            <div class="video-expand" id="video-expand-btn">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="9" y1="21" x2="3" y2="21"></line>
+                <line x1="3" y1="21" x2="3" y2="15"></line>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
               </svg>
             </div>
           </div>
@@ -177,11 +186,7 @@
 
               <div class="btm-telem-item">
                 <div class="btm-icon-wrap orange-wrap">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent-yellow)"
-                    stroke-width="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
+                  <img src="/static/icons/travel-speed.svg" alt="Travel Speed" style="width: 16px; height: 16px;" onerror="this.style.display = 'none'" />
                 </div>
                 <div class="btm-telem-text">
                   <span class="label">TRAVEL SPEED</span>

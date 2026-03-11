@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const recordBtn = document.querySelector(".record-btn");
   const statusDot = document.querySelector(".status-dot");
   const statusText = document.querySelector(".status-text");
+  const videoExpandBtn = document.getElementById("video-expand-btn");
   const loadingOverlay = document.getElementById("loading-overlay");
   const videoFeed = document.getElementById("live-feed");
 
@@ -13,6 +14,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const sysCpu = document.getElementById("sys-cpu");
   const sysRam = document.getElementById("sys-ram");
   const sysUptime = document.getElementById("sys-uptime");
+  const sysBattery = document.getElementById("sys-battery");
+  const sysConnection = document.getElementById("sys-connection");
+  const sysTelemetry = document.getElementById("sys-telemetry");
   const componentList = document.getElementById("component-list");
 
   // State
@@ -22,6 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let pc = null;
   let dc = null;
+  let pingInterval;
+  let lastPingTime = 0;
 
   // Initialize modes
   const modeBadges = document.querySelectorAll(".mode-badge");
@@ -31,6 +37,33 @@ document.addEventListener("DOMContentLoaded", () => {
       badge.classList.add("active");
     });
   });
+
+  if (videoExpandBtn) {
+    videoExpandBtn.addEventListener("click", () => {
+      const videoContainer = document.querySelector(".video-container");
+      if (videoContainer) {
+        if (!document.fullscreenElement) {
+          if (videoContainer.requestFullscreen) {
+            videoContainer.requestFullscreen().catch(err => {
+              console.error(`Error attempting to enable fullscreen: ${err.message}`);
+            });
+          }
+          videoContainer.classList.add("fullscreen");
+        } else {
+          if (document.exitFullscreen) {
+            document.exitFullscreen();
+          }
+        }
+      }
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+      const videoContainer = document.querySelector(".video-container");
+      if (!document.fullscreenElement && videoContainer) {
+        videoContainer.classList.remove("fullscreen");
+      }
+    });
+  }
 
   // Connect Button Handling
   connectBtn.addEventListener("click", () => {
@@ -59,7 +92,11 @@ document.addEventListener("DOMContentLoaded", () => {
       };
 
       dc.onmessage = (event) => {
-        if (event.data === "pong") return;
+        if (event.data === "pong") {
+          const lat = Date.now() - lastPingTime;
+          if (camLatency) camLatency.textContent = lat;
+          return;
+        }
         try {
           const data = JSON.parse(event.data);
           if (data.type === "stats") {
@@ -73,6 +110,23 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             if (data.detections && componentList) {
               updateDetections(data.detections);
+            }
+            if (camFps && data.fps !== undefined) {
+              camFps.textContent = data.fps.toFixed(1);
+            }
+            if (sysBattery && data.battery !== undefined) {
+              sysBattery.textContent = `${data.battery}%`;
+            }
+            if (sysConnection) {
+              if (data.connected) {
+                sysConnection.textContent = "CONNECTED";
+                sysConnection.parentElement.classList.add("accent-green");
+                sysConnection.parentElement.classList.remove("accent-red");
+              } else {
+                sysConnection.textContent = "DISCONNECTED";
+                sysConnection.parentElement.classList.remove("accent-green");
+                sysConnection.parentElement.classList.add("accent-red");
+              }
             }
           }
         } catch (e) {
@@ -156,6 +210,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       stopTelemetry();
+      if (pingInterval) {
+        clearInterval(pingInterval);
+      }
 
       if (isRecording) {
         toggleRecording();
@@ -177,18 +234,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Telemetry Simulation
+  // Telemetry
   function startTelemetry() {
+    pingInterval = setInterval(() => {
+      if (dc && dc.readyState === "open") {
+        lastPingTime = Date.now();
+        dc.send("ping");
+      }
+    }, 1000);
+
     telemetryInterval = setInterval(() => {
-      // Simulate FPS around 30
-      const fps = (29 + Math.random() * 2).toFixed(1);
-      camFps.textContent = fps;
-
-      // Simulate Latency around 90ms
-      const lat = Math.floor(80 + Math.random() * 25);
-      camLatency.textContent = lat;
-
-      // Simulate pose fluctuations
+      // Simulate pose fluctuations (these are still simulated for now)
       const pitch = (2.4 + (Math.random() - 0.5) * 0.2).toFixed(1);
       const roll = (-0.1 + (Math.random() - 0.5) * 0.1).toFixed(1);
       const yaw = (184.2 + (Math.random() - 0.5) * 0.5).toFixed(1);
@@ -232,7 +288,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Update existing cards or create new ones
     Object.keys(uniqueDets).forEach((clsName) => {
       let confPercent = Math.round(uniqueDets[clsName] * 100);
-      
+
       let existingCards = Array.from(componentList.querySelectorAll('.detection-card'));
       let foundCard = existingCards.find((card) => {
         let title = card.querySelector('h4');
@@ -265,7 +321,7 @@ document.addEventListener("DOMContentLoaded", () => {
         componentList.insertAdjacentHTML('afterbegin', cardHTML);
       }
     });
-    
+
     // Set dynamic cards to missing if no longer detected by YOLO (doesn't wipe hardcoded ones)
     let dynamicCards = Array.from(componentList.querySelectorAll('.detection-card[data-dynamic="true"]'));
     dynamicCards.forEach((card) => {

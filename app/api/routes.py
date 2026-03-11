@@ -5,10 +5,14 @@ import psutil
 import asyncio
 import json
 import time
+import logging
 from aiortc import RTCPeerConnection, RTCSessionDescription
 
 from app.core.config import settings
 from app.services.video import CameraStreamTrack, Go2CameraStreamTrack
+from app.services.telemetry import telemetry
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -36,7 +40,7 @@ async def offer(request: Request):
 
     @pc.on("datachannel")
     def on_datachannel(channel):
-        print(f"Server data channel received: {channel.label}")
+        logger.info(f"Server data channel received: {channel.label}")
 
         async def send_telemetry():
             while True:
@@ -44,12 +48,24 @@ async def offer(request: Request):
                     cpu_percent = psutil.cpu_percent(interval=None)
                     ram = psutil.virtual_memory()
                     uptime_seconds = int(time.time() - psutil.boot_time())
+                    fps = getattr(camera_track, "current_fps", 0.0)
                     detections = getattr(camera_track, "latest_detections", [])
-                    data = json.dumps({"type": "stats", "cpu_percent": cpu_percent, "ram_percent": ram.percent, "uptime": uptime_seconds, "detections": detections})
+                    
+                    data = json.dumps({
+                        "type": "stats", 
+                        "cpu_percent": cpu_percent, 
+                        "ram_percent": ram.percent, 
+                        "uptime": uptime_seconds, 
+                        "detections": detections, 
+                        "fps": fps,
+                        "battery": telemetry.battery_soc,
+                        "connected": telemetry.connected and ((time.time() - telemetry.last_update) < 2.0),
+                        "motor_temps": telemetry.motor_temps
+                    })
                     try:
                         channel.send(data)
                     except Exception as e:
-                        print(f"Error sending telemetry: {e}")
+                        logger.error(f"Error sending telemetry: {e}")
                         break
                 elif channel.readyState == "closed":
                     break
@@ -59,7 +75,7 @@ async def offer(request: Request):
 
         @channel.on("message")
         def on_message(message):
-            print(f"Received message: {message}")
+            logger.debug(f"Received message: {message}")
             if message == "ping":
                 channel.send("pong")
 

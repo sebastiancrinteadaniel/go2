@@ -117,6 +117,10 @@ body {
     color: var(--accent-yellow);
 }
 
+.accent-red {
+    color: var(--accent-red);
+}
+
 .highlight-blue {
     color: var(--accent-blue);
 }
@@ -336,17 +340,41 @@ body {
     position: absolute;
     bottom: 1rem;
     right: 1rem;
-    background: rgba(10, 11, 16, 0.75);
-    padding: 0.5rem;
-    border-radius: 4px;
+    background: #151a24;
+    padding: 0.6rem;
+    border-radius: 50%;
     cursor: pointer;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(8px);
-    transition: background 0.2s;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.2s, transform 0.2s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #e2e8f0;
 }
 
 .video-expand:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: #1d2432;
+    transform: scale(1.05);
+}
+
+.video-container.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    border-radius: 0;
+    aspect-ratio: auto;
+}
+
+.video-container.fullscreen .video-overlay-text:not(.mode-selector-container), 
+.video-container.fullscreen .video-telemetry {
+    z-index: 10000;
+}
+
+.video-container.fullscreen .mode-selector-container {
+    display: none;
 }
 
 /* POSE OVERLAY */
