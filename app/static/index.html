@@ -29,19 +29,22 @@
         <div class="telemetry-item">
           <span class="label">CONNECTION</span>
           <span class="val accent-green" id="sys-connection-wrapper" style="gap: 0.4rem;">
-            <img src="/static/icons/connection.svg" alt="Connection" style="width: 16px; height: 16px;" onerror="this.style.display = 'none'" /> <span id="sys-connection">-- ms</span>
+            <img src="/static/icons/connection.svg" alt="Connection" style="width: 16px; height: 16px;"
+              onerror="this.style.display = 'none'" /> <span id="sys-connection">-- ms</span>
           </span>
         </div>
         <div class="telemetry-item">
           <span class="label">TELEMETRY</span>
           <span class="val" id="sys-telemetry-wrapper" style="color: var(--accent-blue); gap: 0.4rem;">
-            <img src="/static/icons/telemetry.svg" alt="Telemetry" style="width: 16px; height: 16px;" onerror="this.style.display = 'none'" /> <span id="sys-telemetry">-- GHz</span>
+            <img src="/static/icons/telemetry.svg" alt="Telemetry" style="width: 16px; height: 16px;"
+              onerror="this.style.display = 'none'" /> <span id="sys-telemetry">-- GHz</span>
           </span>
         </div>
         <div class="telemetry-item">
           <span class="label">POWER</span>
           <span class="val accent-yellow" style="gap: 0.4rem;">
-            <img src="/static/icons/power.svg" alt="Power" style="width: 16px; height: 16px;" onerror="this.style.display = 'none'" /> <span id="sys-battery">84%</span>
+            <img src="/static/icons/power.svg" alt="Power" style="width: 16px; height: 16px;"
+              onerror="this.style.display = 'none'" /> <span id="sys-battery">84%</span>
           </span>
         </div>
         <div class="telemetry-item">
@@ -55,7 +58,8 @@
         <div class="telemetry-item">
           <span class="label">UPTIME</span>
           <span class="val" style="gap: 0.4rem;">
-            <img src="/static/icons/uptime.svg" alt="Uptime" style="width: 16px; height: 16px;" onerror="this.style.display = 'none'" /> <span id="sys-uptime">--:--:--</span>
+            <img src="/static/icons/uptime.svg" alt="Uptime" style="width: 16px; height: 16px;"
+              onerror="this.style.display = 'none'" /> <span id="sys-uptime">--:--:--</span>
           </span>
         </div>
       </div>
@@ -105,7 +109,8 @@
 
             <!-- Expand icon (Bottom right) -->
             <div class="video-expand" id="video-expand-btn">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="15 3 21 3 21 9"></polyline>
                 <line x1="9" y1="21" x2="3" y2="21"></line>
                 <line x1="3" y1="21" x2="3" y2="15"></line>
@@ -151,6 +156,14 @@
               <button class="icon-btn record-btn" aria-label="Record">
                 <div class="record-dot"></div>
               </button>
+              <button id="yolo-btn" class="secondary-btn" aria-label="Toggle AI Detection" title="Toggle AI Detection"
+                style="display: none;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+                AI DETECT
+              </button>
 
               <button class="secondary-btn">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -186,7 +199,8 @@
 
               <div class="btm-telem-item">
                 <div class="btm-icon-wrap orange-wrap">
-                  <img src="/static/icons/travel-speed.svg" alt="Travel Speed" style="width: 16px; height: 16px;" onerror="this.style.display = 'none'" />
+                  <img src="/static/icons/travel-speed.svg" alt="Travel Speed" style="width: 16px; height: 16px;"
+                    onerror="this.style.display = 'none'" />
                 </div>
                 <div class="btm-telem-text">
                   <span class="label">TRAVEL SPEED</span>

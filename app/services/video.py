@@ -1,89 +1,43 @@
 import cv2
 import logging
 import time
-import threading
 
 from aiortc import VideoStreamTrack
 from av import VideoFrame
 from app.core.config import settings
 
+from app.services.yolo_processor import YOLOProcessor
+
 logger = logging.getLogger(__name__)
 
-try:
-    from ultralytics import YOLO
 
-    model = YOLO("app/models/yolov8n.pt")
-except ImportError:
-    model = None
-    logger.warning(
-        "'ultralytics' package not found. Object detection disabled. Please install it later to enable YOLO."
-    )
+def draw_yolo_detections(frame, detections):
+    for d in detections:
+        x1, y1, x2, y2 = d["bbox"]
+        cls_name = d["class"]
+        label = f"{cls_name} {d['conf']:.2f}"
 
+        h = hash(cls_name)
+        color = ((h * 31 % 200 + 55), (h * 73 % 200 + 55), (h * 127 % 200 + 55))
 
-class YOLOProcessor:
-    """
-    Handles YOLO object detection in a background thread so it doesn't block the video stream.
-    """
-
-    def __init__(self):
-        self.latest_detections = []
-        self.frame_to_process = None
-        self.running = True
-        self.lock = threading.Lock()
-
-        self.thread = threading.Thread(target=self._worker, daemon=True)
-        if model is not None:
-            self.thread.start()
-
-    def update_frame(self, frame):
-        if frame is None:
-            return
-
-        if self.lock.acquire(blocking=False):
-            self.frame_to_process = frame.copy()
-            self.lock.release()
-
-    def get_detections(self):
-        with self.lock:
-            return list(self.latest_detections)
-
-    def _worker(self):
-        while self.running:
-            frame = None
-            with self.lock:
-                if self.frame_to_process is not None:
-                    frame = self.frame_to_process
-                    self.frame_to_process = None
-
-            if frame is not None:
-                results = model(frame, verbose=False)
-
-                detections = []
-                for box in results[0].boxes:
-                    cls_id = int(box.cls[0])
-                    conf = float(box.conf[0])
-                    cls_name = model.names[cls_id]
-                    x1, y1, x2, y2 = box.xyxy[0].tolist()
-                    detections.append(
-                        {
-                            "class": cls_name,
-                            "conf": conf,
-                            "bbox": (int(x1), int(y1), int(x2), int(y2)),
-                        }
-                    )
-
-                with self.lock:
-                    self.latest_detections = detections
-            else:
-                time.sleep(0.01)
-
-    def stop(self):
-        self.running = False
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+        cv2.rectangle(frame, (x1, y1 - th - 10), (x1 + tw, y1), color, -1)
+        cv2.putText(
+            frame,
+            label,
+            (x1, y1 - 5),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (255, 255, 255),
+            2,
+        )
+    return frame
 
 
 class CameraStreamTrack(VideoStreamTrack):
     """
-    A video stream track that reads frames from a local web camera (or a dummy frames generator if missing).
+    A video stream track that reads frames from a local web camera.
     """
 
     def __init__(self):
@@ -101,35 +55,6 @@ class CameraStreamTrack(VideoStreamTrack):
         self.start_time = time.time()
         self.current_fps = 0.0
 
-    @property
-    def latest_detections(self):
-        return self.yolo_processor.get_detections()
-
-    def _draw_detections(self, frame, detections):
-        for d in detections:
-            x1, y1, x2, y2 = d["bbox"]
-            cls_name = d["class"]
-            label = f"{cls_name} {d['conf']:.2f}"
-
-            h = hash(cls_name)
-            color = ((h * 31 % 200 + 55), (h * 73 % 200 + 55), (h * 127 % 200 + 55))
-
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-
-            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
-            cv2.rectangle(frame, (x1, y1 - th - 10), (x1 + tw, y1), color, -1)
-
-            cv2.putText(
-                frame,
-                label,
-                (x1, y1 - 5),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (255, 255, 255),
-                2,
-            )
-        return frame
-
     async def recv(self):
         pts, time_base = await self.next_timestamp()
         ret, frame = self.cap.read()
@@ -137,7 +62,6 @@ class CameraStreamTrack(VideoStreamTrack):
         if not ret:
             if frame is None:
                 import numpy as np
-
                 frame = np.zeros((480, 640, 3), dtype=np.uint8)
 
         self.frame_count += 1
@@ -148,8 +72,7 @@ class CameraStreamTrack(VideoStreamTrack):
             self.start_time = time.time()
 
         self.yolo_processor.update_frame(frame)
-
-        frame = self._draw_detections(frame, self.latest_detections)
+        frame = draw_yolo_detections(frame, self.yolo_processor.get_detections())
 
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -189,35 +112,6 @@ class Go2CameraStreamTrack(VideoStreamTrack):
         self.frame_count = 0
         self.start_time = time.time()
         self.current_fps = 0.0
-
-    @property
-    def latest_detections(self):
-        return self.yolo_processor.get_detections()
-
-    def _draw_detections(self, frame, detections):
-        for d in detections:
-            x1, y1, x2, y2 = d["bbox"]
-            cls_name = d["class"]
-            label = f"{cls_name} {d['conf']:.2f}"
-
-            h = hash(cls_name)
-            color = ((h * 31 % 200 + 55), (h * 73 % 200 + 55), (h * 127 % 200 + 55))
-
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-
-            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
-            cv2.rectangle(frame, (x1, y1 - th - 10), (x1 + tw, y1), color, -1)
-
-            cv2.putText(
-                frame,
-                label,
-                (x1, y1 - 5),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (255, 255, 255),
-                2,
-            )
-        return frame
 
     async def recv(self):
         pts, time_base = await self.next_timestamp()
@@ -259,8 +153,7 @@ class Go2CameraStreamTrack(VideoStreamTrack):
             self.start_time = time.time()
 
         self.yolo_processor.update_frame(frame)
-
-        frame = self._draw_detections(frame, self.latest_detections)
+        frame = draw_yolo_detections(frame, self.yolo_processor.get_detections())
 
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 

@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const videoExpandBtn = document.getElementById("video-expand-btn");
   const loadingOverlay = document.getElementById("loading-overlay");
   const videoFeed = document.getElementById("live-feed");
+  const yoloBtn = document.getElementById("yolo-btn");
 
   const camFps = document.getElementById("cam-fps");
   const camLatency = document.getElementById("cam-latency");
@@ -22,6 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // State
   let isConnected = false;
   let isRecording = false;
+  let isYoloEnabled = false;
   let telemetryInterval;
 
   let pc = null;
@@ -65,6 +67,24 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  if (yoloBtn) {
+    yoloBtn.addEventListener("click", () => {
+      isYoloEnabled = !isYoloEnabled;
+      if (isYoloEnabled) {
+        yoloBtn.style.color = "#fff";
+        yoloBtn.style.borderColor = "var(--accent-blue)";
+        yoloBtn.style.background = "var(--accent-blue)";
+      } else {
+        yoloBtn.style.color = "";
+        yoloBtn.style.borderColor = "";
+        yoloBtn.style.background = "";
+      }
+      if (dc && dc.readyState === "open") {
+        dc.send("toggle_yolo");
+      }
+    });
+  }
+
   // Connect Button Handling
   connectBtn.addEventListener("click", () => {
     if (!isConnected) {
@@ -87,6 +107,14 @@ document.addEventListener("DOMContentLoaded", () => {
         statusText.classList.remove("disconnected");
         statusText.classList.add("connected");
         statusText.textContent = "LIVE STREAM CONNECTED";
+
+        if (yoloBtn) {
+          yoloBtn.style.display = "flex";
+        }
+
+        if (isYoloEnabled) {
+          dc.send("toggle_yolo");
+        }
 
         startTelemetry();
       };
@@ -195,6 +223,10 @@ document.addEventListener("DOMContentLoaded", () => {
       statusText.classList.add("disconnected");
       statusText.classList.remove("connected");
       statusText.textContent = "LIVE STREAM DISCONNECTED";
+
+      if (yoloBtn) {
+        yoloBtn.style.display = "none";
+      }
 
       if (videoFeed.srcObject) {
         videoFeed.srcObject.getTracks().forEach((track) => track.stop());

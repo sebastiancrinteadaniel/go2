@@ -81,6 +81,8 @@ async def offer(request: Request):
             logger.debug(f"Received message: {message}")
             if message == "ping":
                 channel.send("pong")
+            elif message == "toggle_yolo":
+                camera_track.yolo_processor.enabled = not camera_track.yolo_processor.enabled
 
     mode = params.get("mode", "hd_view")
 
