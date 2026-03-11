@@ -38,6 +38,9 @@ async def offer(request: Request):
     offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
     pc = RTCPeerConnection()
 
+    # Initialize telemetry when WebRTC connection is established
+    telemetry.init()
+
     @pc.on("datachannel")
     def on_datachannel(channel):
         logger.info(f"Server data channel received: {channel.label}")

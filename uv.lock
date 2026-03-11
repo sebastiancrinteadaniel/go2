@@ -156,7 +156,7 @@ requires-dist = [
     { name = "opencv-python", specifier = ">=4.13.0.92" },
     { name = "psutil", specifier = ">=7.2.2" },
     { name = "ultralytics", specifier = ">=8.4.21" },
-    { name = "unitree-sdk2py", directory = "../unitree_sdk2_python" },
+    { name = "unitree-sdk2py", editable = "../unitree_sdk2_python" },
 ]
 
 [[package]]
@@ -2874,7 +2874,7 @@ wheels = [
 [[package]]
 name = "unitree-sdk2py"
 version = "1.0.1"
-source = { directory = "../unitree_sdk2_python" }
+source = { editable = "../unitree_sdk2_python" }
 dependencies = [
     { name = "cyclonedds" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
