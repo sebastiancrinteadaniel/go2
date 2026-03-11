@@ -6,7 +6,6 @@ from app.core.config import settings
 
 app = FastAPI(title="Go2 Dashboard")
 
-# Mount static files for the frontend
 app.mount("/static", StaticFiles(directory=settings.STATIC_DIR), name="static")
 
 app.include_router(router)

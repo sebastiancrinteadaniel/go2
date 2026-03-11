@@ -50,7 +50,7 @@
         </div>
         <div class="telemetry-item">
           <span class="label">UPTIME</span>
-          <span class="val">02:14:45</span>
+          <span class="val" id="sys-uptime">--:--:--</span>
         </div>
       </div>
     </header>
@@ -82,6 +82,11 @@
                 <img src="/static/icons/sensor-fusion.svg" class="mode-icon" alt=""
                   onerror="this.style.display = 'none'" />
                 <span>SENSOR FUSION</span>
+              </div>
+              <div class="mode-badge">
+                <img src="/static/icons/go2-camera.svg" class="mode-icon" alt=""
+                  onerror="this.style.display = 'none'" />
+                <span>GO2 CAMERA</span>
               </div>
             </div>
 
@@ -210,7 +215,7 @@
             <h3>INDUSTRIAL COMPONENT DETECTION</h3>
           </div>
 
-          <div class="component-list">
+          <div class="component-list" id="component-list">
             <!-- Card 1 -->
             <div class="detection-card status-present">
               <div class="dc-header">

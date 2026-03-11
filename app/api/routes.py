@@ -4,10 +4,11 @@ import os
 import psutil
 import asyncio
 import json
+import time
 from aiortc import RTCPeerConnection, RTCSessionDescription
 
 from app.core.config import settings
-from app.services.video import CameraStreamTrack
+from app.services.video import CameraStreamTrack, Go2CameraStreamTrack
 
 router = APIRouter()
 
@@ -42,7 +43,9 @@ async def offer(request: Request):
                 if channel.readyState == "open":
                     cpu_percent = psutil.cpu_percent(interval=None)
                     ram = psutil.virtual_memory()
-                    data = json.dumps({"type": "stats", "cpu_percent": cpu_percent, "ram_percent": ram.percent})
+                    uptime_seconds = int(time.time() - psutil.boot_time())
+                    detections = getattr(camera_track, "latest_detections", [])
+                    data = json.dumps({"type": "stats", "cpu_percent": cpu_percent, "ram_percent": ram.percent, "uptime": uptime_seconds, "detections": detections})
                     try:
                         channel.send(data)
                     except Exception as e:
@@ -50,7 +53,7 @@ async def offer(request: Request):
                         break
                 elif channel.readyState == "closed":
                     break
-                await asyncio.sleep(5)
+                await asyncio.sleep(1)
 
         asyncio.create_task(send_telemetry())
 
@@ -60,8 +63,14 @@ async def offer(request: Request):
             if message == "ping":
                 channel.send("pong")
 
-    # Add video track using local camera
-    pc.addTrack(CameraStreamTrack())
+    mode = params.get("mode", "hd_view")
+
+    if mode == "go2":
+        camera_track = Go2CameraStreamTrack()
+    else:
+        camera_track = CameraStreamTrack()
+
+    pc.addTrack(camera_track)
 
     await pc.setRemoteDescription(offer)
     answer = await pc.createAnswer()

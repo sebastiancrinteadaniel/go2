@@ -12,6 +12,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const sysCpu = document.getElementById("sys-cpu");
   const sysRam = document.getElementById("sys-ram");
+  const sysUptime = document.getElementById("sys-uptime");
+  const componentList = document.getElementById("component-list");
 
   // State
   let isConnected = false;
@@ -63,6 +65,15 @@ document.addEventListener("DOMContentLoaded", () => {
           if (data.type === "stats") {
             if (sysCpu) sysCpu.textContent = `${data.cpu_percent.toFixed(1)}%`;
             if (sysRam) sysRam.textContent = `${data.ram_percent.toFixed(1)}%`;
+            if (sysUptime && data.uptime !== undefined) {
+              const hours = Math.floor(data.uptime / 3600);
+              const minutes = Math.floor((data.uptime % 3600) / 60);
+              const seconds = Math.floor(data.uptime % 60);
+              sysUptime.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+            if (data.detections && componentList) {
+              updateDetections(data.detections);
+            }
           }
         } catch (e) {
           // Ignore non-json
@@ -78,6 +89,20 @@ document.addEventListener("DOMContentLoaded", () => {
       // Explicitly request to receive video so the backend knows what to negotiate
       pc.addTransceiver("video", { direction: "recvonly" });
 
+      let selectedMode = "hd_view";
+      modeBadges.forEach((badge) => {
+        if (badge.classList.contains("active")) {
+          const span = badge.querySelector("span");
+          if (span && span.textContent === "GO2 CAMERA") {
+            selectedMode = "go2";
+          } else if (span && span.textContent === "THERMAL") {
+            selectedMode = "thermal";
+          } else if (span && span.textContent === "SENSOR FUSION") {
+            selectedMode = "sensor_fusion";
+          }
+        }
+      });
+
       pc.createOffer()
         .then((offer) => pc.setLocalDescription(offer))
         .then(() =>
@@ -85,6 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
             body: JSON.stringify({
               sdp: pc.localDescription.sdp,
               type: pc.localDescription.type,
+              mode: selectedMode,
             }),
             headers: { "Content-Type": "application/json" },
             method: "POST",
@@ -188,5 +214,66 @@ document.addEventListener("DOMContentLoaded", () => {
       poseVals[1].textContent = "-0.1°";
       poseVals[2].textContent = "184.2°";
     }
+  }
+
+  function updateDetections(detections) {
+    if (!componentList) return;
+
+    // Group detections by class name and get the highest confidence
+    const uniqueDets = {};
+    detections.forEach((d) => {
+      // Capitalize the class name nicely
+      const clsName = d.class.charAt(0).toUpperCase() + d.class.slice(1);
+      if (!uniqueDets[clsName] || uniqueDets[clsName] < d.conf) {
+        uniqueDets[clsName] = d.conf;
+      }
+    });
+
+    // Update existing cards or create new ones
+    Object.keys(uniqueDets).forEach((clsName) => {
+      let confPercent = Math.round(uniqueDets[clsName] * 100);
+      
+      let existingCards = Array.from(componentList.querySelectorAll('.detection-card'));
+      let foundCard = existingCards.find((card) => {
+        let title = card.querySelector('h4');
+        return title && title.textContent === clsName;
+      });
+
+      if (foundCard) {
+        // Update the card if it exists (handles both hardcoded and dynamic)
+        foundCard.className = 'detection-card status-present';
+        foundCard.querySelector('.dc-state').textContent = 'PRESENT';
+        foundCard.querySelector('.dc-conf').textContent = `CONF: ${confPercent}%`;
+      } else {
+        // Create a new dynamic card specifically for computer vision targets
+        const cardHTML = `
+            <div class="detection-card status-present" data-dynamic="true">
+              <div class="dc-header">
+                <h4>${clsName}</h4>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+              </div>
+              <div class="dc-footer">
+                <span class="dc-state">PRESENT</span>
+                <span class="dc-conf">CONF: ${confPercent}%</span>
+              </div>
+            </div>
+        `;
+        // Insert at the top of the list so it's easily noticeable
+        componentList.insertAdjacentHTML('afterbegin', cardHTML);
+      }
+    });
+    
+    // Set dynamic cards to missing if no longer detected by YOLO (doesn't wipe hardcoded ones)
+    let dynamicCards = Array.from(componentList.querySelectorAll('.detection-card[data-dynamic="true"]'));
+    dynamicCards.forEach((card) => {
+      let title = card.querySelector('h4').textContent;
+      if (!uniqueDets[title]) {
+        card.className = 'detection-card status-missing';
+        card.querySelector('.dc-state').textContent = 'MISSING';
+      }
+    });
   }
 });
