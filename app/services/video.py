@@ -1,6 +1,7 @@
 import cv2
 import logging
 import time
+import threading
 
 from aiortc import VideoStreamTrack
 from av import VideoFrame
@@ -10,11 +11,74 @@ logger = logging.getLogger(__name__)
 
 try:
     from ultralytics import YOLO
+
     model = YOLO("app/models/yolov8n.pt")
 except ImportError:
     model = None
-    logger.warning("'ultralytics' package not found. Object detection disabled. Please install it later to enable YOLO.")
+    logger.warning(
+        "'ultralytics' package not found. Object detection disabled. Please install it later to enable YOLO."
+    )
 
+
+class YOLOProcessor:
+    """
+    Handles YOLO object detection in a background thread so it doesn't block the video stream.
+    """
+
+    def __init__(self):
+        self.latest_detections = []
+        self.frame_to_process = None
+        self.running = True
+        self.lock = threading.Lock()
+
+        self.thread = threading.Thread(target=self._worker, daemon=True)
+        if model is not None:
+            self.thread.start()
+
+    def update_frame(self, frame):
+        if frame is None:
+            return
+
+        if self.lock.acquire(blocking=False):
+            self.frame_to_process = frame.copy()
+            self.lock.release()
+
+    def get_detections(self):
+        with self.lock:
+            return list(self.latest_detections)
+
+    def _worker(self):
+        while self.running:
+            frame = None
+            with self.lock:
+                if self.frame_to_process is not None:
+                    frame = self.frame_to_process
+                    self.frame_to_process = None
+
+            if frame is not None:
+                results = model(frame, verbose=False)
+
+                detections = []
+                for box in results[0].boxes:
+                    cls_id = int(box.cls[0])
+                    conf = float(box.conf[0])
+                    cls_name = model.names[cls_id]
+                    x1, y1, x2, y2 = box.xyxy[0].tolist()
+                    detections.append(
+                        {
+                            "class": cls_name,
+                            "conf": conf,
+                            "bbox": (int(x1), int(y1), int(x2), int(y2)),
+                        }
+                    )
+
+                with self.lock:
+                    self.latest_detections = detections
+            else:
+                time.sleep(0.01)
+
+    def stop(self):
+        self.running = False
 
 
 class CameraStreamTrack(VideoStreamTrack):
@@ -30,28 +94,40 @@ class CameraStreamTrack(VideoStreamTrack):
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, settings.CAMERA_WIDTH)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, settings.CAMERA_HEIGHT)
         self.cap.set(cv2.CAP_PROP_FPS, settings.CAMERA_FPS)
-        self.latest_detections = []
+
+        self.yolo_processor = YOLOProcessor()
+
         self.frame_count = 0
         self.start_time = time.time()
         self.current_fps = 0.0
 
-    def _apply_yolo_inference(self, frame):
-        """
-        Applies YOLO object detection to the frame.
-        """
-        self.latest_detections = []
-        if model is not None:
-            results = model(frame, verbose=False)
-            
-            detections = []
-            for box in results[0].boxes:
-                cls_id = int(box.cls[0])
-                conf = float(box.conf[0])
-                cls_name = model.names[cls_id]
-                detections.append({"class": cls_name, "conf": conf})
-            self.latest_detections = detections
+    @property
+    def latest_detections(self):
+        return self.yolo_processor.get_detections()
 
-            return results[0].plot()
+    def _draw_detections(self, frame, detections):
+        for d in detections:
+            x1, y1, x2, y2 = d["bbox"]
+            cls_name = d["class"]
+            label = f"{cls_name} {d['conf']:.2f}"
+
+            h = hash(cls_name)
+            color = ((h * 31 % 200 + 55), (h * 73 % 200 + 55), (h * 127 % 200 + 55))
+
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+
+            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+            cv2.rectangle(frame, (x1, y1 - th - 10), (x1 + tw, y1), color, -1)
+
+            cv2.putText(
+                frame,
+                label,
+                (x1, y1 - 5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (255, 255, 255),
+                2,
+            )
         return frame
 
     async def recv(self):
@@ -61,6 +137,7 @@ class CameraStreamTrack(VideoStreamTrack):
         if not ret:
             if frame is None:
                 import numpy as np
+
                 frame = np.zeros((480, 640, 3), dtype=np.uint8)
 
         self.frame_count += 1
@@ -70,7 +147,9 @@ class CameraStreamTrack(VideoStreamTrack):
             self.frame_count = 0
             self.start_time = time.time()
 
-        frame = self._apply_yolo_inference(frame)
+        self.yolo_processor.update_frame(frame)
+
+        frame = self._draw_detections(frame, self.latest_detections)
 
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -90,6 +169,7 @@ class Go2CameraStreamTrack(VideoStreamTrack):
         super().__init__()
         try:
             from unitree_sdk2py.go2.video.video_client import VideoClient
+
             self.client = VideoClient()
             self.client.SetTimeout(3.0)
             self.client.Init()
@@ -97,47 +177,60 @@ class Go2CameraStreamTrack(VideoStreamTrack):
             logger.info("Unitree SDK VideoClient initialized successfully.")
         except ImportError:
             self.connected = False
-            logger.warning("'unitree_sdk2py' not found. Ensure it is installed for the Go2 camera stream to work.")
+            logger.warning(
+                "'unitree_sdk2py' not found. Ensure it is installed for the Go2 camera stream to work."
+            )
         except Exception as e:
             self.connected = False
             logger.error(f"Error initializing Go2 VideoClient: {e}")
 
-        self.latest_detections = []
+        self.yolo_processor = YOLOProcessor()
+
         self.frame_count = 0
         self.start_time = time.time()
         self.current_fps = 0.0
 
-    def _apply_yolo_inference(self, frame):
-        """
-        Applies YOLO object detection to the frame.
-        """
-        self.latest_detections = []
-        if model is not None:
-            results = model(frame, verbose=False)
-            
-            detections = []
-            for box in results[0].boxes:
-                cls_id = int(box.cls[0])
-                conf = float(box.conf[0])
-                cls_name = model.names[cls_id]
-                detections.append({"class": cls_name, "conf": conf})
-            self.latest_detections = detections
+    @property
+    def latest_detections(self):
+        return self.yolo_processor.get_detections()
 
-            return results[0].plot()
+    def _draw_detections(self, frame, detections):
+        for d in detections:
+            x1, y1, x2, y2 = d["bbox"]
+            cls_name = d["class"]
+            label = f"{cls_name} {d['conf']:.2f}"
+
+            h = hash(cls_name)
+            color = ((h * 31 % 200 + 55), (h * 73 % 200 + 55), (h * 127 % 200 + 55))
+
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+
+            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+            cv2.rectangle(frame, (x1, y1 - th - 10), (x1 + tw, y1), color, -1)
+
+            cv2.putText(
+                frame,
+                label,
+                (x1, y1 - 5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (255, 255, 255),
+                2,
+            )
         return frame
 
     async def recv(self):
         pts, time_base = await self.next_timestamp()
-        
+
         frame = None
         if self.connected:
             import numpy as np
+
             try:
                 code, data = self.client.GetImageSample()
                 if code == 0:
                     image_data = np.frombuffer(bytes(data), dtype=np.uint8)
                     frame = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
-                    logger.info(f"Go2 Camera Resolution: {frame.shape[1]}x{frame.shape[0]}")
                 else:
                     logger.warning(f"Get image sample error. code: {code}")
             except Exception as e:
@@ -145,9 +238,18 @@ class Go2CameraStreamTrack(VideoStreamTrack):
 
         if frame is None:
             import numpy as np
+
             frame = np.zeros((480, 640, 3), dtype=np.uint8)
-            cv2.putText(frame, "GO2 CAMERA UNAVAILABLE", (50, 240), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+            cv2.putText(
+                frame,
+                "GO2 CAMERA UNAVAILABLE",
+                (50, 240),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (0, 0, 255),
+                2,
+                cv2.LINE_AA,
+            )
 
         self.frame_count += 1
         elapsed = time.time() - self.start_time
@@ -156,7 +258,9 @@ class Go2CameraStreamTrack(VideoStreamTrack):
             self.frame_count = 0
             self.start_time = time.time()
 
-        frame = self._apply_yolo_inference(frame)
+        self.yolo_processor.update_frame(frame)
+
+        frame = self._draw_detections(frame, self.latest_detections)
 
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
