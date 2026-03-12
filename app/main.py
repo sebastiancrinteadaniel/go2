@@ -41,6 +41,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Error initializing Unitree SDK: {e}")
 
+    try:
+        import torch
+        if torch.cuda.is_available():
+            logger.info(f"PyTorch CUDA available — device: {torch.cuda.get_device_name(0)}")
+        else:
+            logger.info("PyTorch CUDA not available — running on CPU")
+    except ImportError:
+        logger.warning("PyTorch not installed.")
+
     yield
 
 
