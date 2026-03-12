@@ -1,7 +1,7 @@
 import asyncio
 import cv2
 import logging
-import time
+from collections import deque
 
 import numpy as np
 from aiortc import VideoStreamTrack
@@ -11,6 +11,21 @@ from app.core.config import settings
 from app.services.yolo_processor import YOLOProcessor
 
 logger = logging.getLogger(__name__)
+
+
+class CvFpsCalc:
+    def __init__(self, buffer_len: int = 10):
+        self._start_tick = cv2.getTickCount()
+        self._freq = 1000.0 / cv2.getTickFrequency()
+        self._difftimes = deque(maxlen=buffer_len)
+
+    def get(self) -> float:
+        current_tick = cv2.getTickCount()
+        different_time = (current_tick - self._start_tick) * self._freq
+        self._start_tick = current_tick
+        self._difftimes.append(different_time)
+        fps = 1000.0 / (sum(self._difftimes) / len(self._difftimes))
+        return round(fps, 2)
 
 
 class CameraStreamTrack(VideoStreamTrack):
@@ -30,8 +45,7 @@ class CameraStreamTrack(VideoStreamTrack):
         self.yolo_processor = YOLOProcessor()
         self.latest_detections = []
 
-        self.frame_count = 0
-        self.start_time = time.time()
+        self.fps_calc = CvFpsCalc(buffer_len=10)
         self.current_fps = 0.0
 
     async def recv(self):
@@ -43,12 +57,7 @@ class CameraStreamTrack(VideoStreamTrack):
         if not ret or frame is None:
             frame = np.zeros((480, 640, 3), dtype=np.uint8)
 
-        self.frame_count += 1
-        elapsed = time.time() - self.start_time
-        if elapsed >= 1.0:
-            self.current_fps = self.frame_count / elapsed
-            self.frame_count = 0
-            self.start_time = time.time()
+        self.current_fps = self.fps_calc.get()
 
         frame, self.latest_detections = await self.yolo_processor.process(frame)
 
@@ -88,8 +97,7 @@ class Go2CameraStreamTrack(VideoStreamTrack):
         self.yolo_processor = YOLOProcessor()
         self.latest_detections = []
 
-        self.frame_count = 0
-        self.start_time = time.time()
+        self.fps_calc = CvFpsCalc(buffer_len=10)
         self.current_fps = 0.0
 
     async def recv(self):
@@ -121,12 +129,7 @@ class Go2CameraStreamTrack(VideoStreamTrack):
                 cv2.LINE_AA,
             )
 
-        self.frame_count += 1
-        elapsed = time.time() - self.start_time
-        if elapsed >= 1.0:
-            self.current_fps = self.frame_count / elapsed
-            self.frame_count = 0
-            self.start_time = time.time()
+        self.current_fps = self.fps_calc.get()
 
         frame, self.latest_detections = await self.yolo_processor.process(frame)
 
