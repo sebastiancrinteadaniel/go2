@@ -1,73 +1,59 @@
-import threading
-import time
+import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
 
 try:
     from ultralytics import YOLO
-    model = YOLO("app/models/yolov8n.pt")
+    _model = YOLO("app/models/yolov8n.pt")
 except ImportError:
-    model = None
+    _model = None
     logger.warning("'ultralytics' package not found. Object detection disabled. Please install it later to enable YOLO.")
 
 
 class YOLOProcessor:
     """
-    Handles YOLO object detection in a background thread so it doesn't block the video stream.
+    Handles YOLO object detection by running inference in a thread-pool executor
+    so it never blocks the asyncio event loop. Inference and annotation happen on
+    the same frame that is about to be sent, eliminating the stale-detection lag.
     """
+
     def __init__(self):
         self.enabled = False
-        self.latest_detections = []
-        self.frame_to_process = None
-        self.running = True
-        self.lock = threading.Lock()
-        
-        self.thread = threading.Thread(target=self._worker, daemon=True)
-        if model is not None:
-            self.thread.start()
 
-    def update_frame(self, frame):
-        if frame is None or not self.enabled:
-            return
-        
-        if self.lock.acquire(blocking=False):
-            self.frame_to_process = frame.copy()
-            self.lock.release()
+    async def process(self, frame):
+        """
+        Run YOLO inference on the frame if enabled.
 
-    def get_detections(self):
-        if not self.enabled:
-            return []
-        with self.lock:
-            return list(self.latest_detections)
+        Returns:
+            (annotated_frame, detections) where detections is a list of dicts
+            with keys 'class', 'conf', 'bbox'.
+            If disabled or model unavailable, returns (original_frame, []).
+        """
+        if not self.enabled or _model is None:
+            return frame, []
 
-    def _worker(self):
-        while self.running:
-            frame = None
-            with self.lock:
-                if self.frame_to_process is not None:
-                    frame = self.frame_to_process
-                    self.frame_to_process = None
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(
+            None, lambda: _model(frame, verbose=False)
+        )
 
-            if frame is not None:
-                results = model(frame, verbose=False)
-                
-                detections = []
-                for box in results[0].boxes:
-                    cls_id = int(box.cls[0])
-                    conf = float(box.conf[0])
-                    cls_name = model.names[cls_id]
-                    x1, y1, x2, y2 = box.xyxy[0].tolist()
-                    detections.append({
-                        "class": cls_name, 
-                        "conf": conf,
-                        "bbox": (int(x1), int(y1), int(x2), int(y2))
-                    })
-                
-                with self.lock:
-                    self.latest_detections = detections
-            else:
-                time.sleep(0.01)
+        result = results[0]
+        annotated_frame = result.plot()
+
+        detections = []
+        for box in result.boxes:
+            cls_id = int(box.cls[0])
+            conf = float(box.conf[0])
+            cls_name = _model.names[cls_id]
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            detections.append({
+                "class": cls_name,
+                "conf": conf,
+                "bbox": (int(x1), int(y1), int(x2), int(y2)),
+            })
+
+        return annotated_frame, detections
 
     def stop(self):
-        self.running = False
+        pass

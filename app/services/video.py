@@ -1,7 +1,9 @@
+import asyncio
 import cv2
 import logging
 import time
 
+import numpy as np
 from aiortc import VideoStreamTrack
 from av import VideoFrame
 from app.core.config import settings
@@ -9,30 +11,6 @@ from app.core.config import settings
 from app.services.yolo_processor import YOLOProcessor
 
 logger = logging.getLogger(__name__)
-
-
-def draw_yolo_detections(frame, detections):
-    for d in detections:
-        x1, y1, x2, y2 = d["bbox"]
-        cls_name = d["class"]
-        label = f"{cls_name} {d['conf']:.2f}"
-
-        h = hash(cls_name)
-        color = ((h * 31 % 200 + 55), (h * 73 % 200 + 55), (h * 127 % 200 + 55))
-
-        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
-        cv2.rectangle(frame, (x1, y1 - th - 10), (x1 + tw, y1), color, -1)
-        cv2.putText(
-            frame,
-            label,
-            (x1, y1 - 5),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (255, 255, 255),
-            2,
-        )
-    return frame
 
 
 class CameraStreamTrack(VideoStreamTrack):
@@ -50,6 +28,7 @@ class CameraStreamTrack(VideoStreamTrack):
         self.cap.set(cv2.CAP_PROP_FPS, settings.CAMERA_FPS)
 
         self.yolo_processor = YOLOProcessor()
+        self.latest_detections = []
 
         self.frame_count = 0
         self.start_time = time.time()
@@ -57,12 +36,12 @@ class CameraStreamTrack(VideoStreamTrack):
 
     async def recv(self):
         pts, time_base = await self.next_timestamp()
-        ret, frame = self.cap.read()
 
-        if not ret:
-            if frame is None:
-                import numpy as np
-                frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        loop = asyncio.get_event_loop()
+        ret, frame = await loop.run_in_executor(None, self.cap.read)
+
+        if not ret or frame is None:
+            frame = np.zeros((480, 640, 3), dtype=np.uint8)
 
         self.frame_count += 1
         elapsed = time.time() - self.start_time
@@ -71,8 +50,7 @@ class CameraStreamTrack(VideoStreamTrack):
             self.frame_count = 0
             self.start_time = time.time()
 
-        self.yolo_processor.update_frame(frame)
-        frame = draw_yolo_detections(frame, self.yolo_processor.get_detections())
+        frame, self.latest_detections = await self.yolo_processor.process(frame)
 
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -108,6 +86,7 @@ class Go2CameraStreamTrack(VideoStreamTrack):
             logger.error(f"Error initializing Go2 VideoClient: {e}")
 
         self.yolo_processor = YOLOProcessor()
+        self.latest_detections = []
 
         self.frame_count = 0
         self.start_time = time.time()
@@ -118,10 +97,9 @@ class Go2CameraStreamTrack(VideoStreamTrack):
 
         frame = None
         if self.connected:
-            import numpy as np
-
+            loop = asyncio.get_event_loop()
             try:
-                code, data = self.client.GetImageSample()
+                code, data = await loop.run_in_executor(None, self.client.GetImageSample)
                 if code == 0:
                     image_data = np.frombuffer(bytes(data), dtype=np.uint8)
                     frame = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
@@ -131,8 +109,6 @@ class Go2CameraStreamTrack(VideoStreamTrack):
                 logger.error(f"Error getting Go2 image: {e}")
 
         if frame is None:
-            import numpy as np
-
             frame = np.zeros((480, 640, 3), dtype=np.uint8)
             cv2.putText(
                 frame,
@@ -152,8 +128,7 @@ class Go2CameraStreamTrack(VideoStreamTrack):
             self.frame_count = 0
             self.start_time = time.time()
 
-        self.yolo_processor.update_frame(frame)
-        frame = draw_yolo_detections(frame, self.yolo_processor.get_detections())
+        frame, self.latest_detections = await self.yolo_processor.process(frame)
 
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
