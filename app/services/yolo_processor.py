@@ -1,6 +1,7 @@
+import cv2
 import logging
+import queue
 import threading
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -12,78 +13,87 @@ except ImportError:
     logger.warning("'ultralytics' package not found. Object detection disabled. Please install it later to enable YOLO.")
 
 
+def _safe_put(q: queue.Queue, item):
+    """Non-blocking put — drops the old item if full (always keep newest frame)."""
+    try:
+        q.put_nowait(item)
+    except queue.Full:
+        try:
+            q.get_nowait()
+        except queue.Empty:
+            pass
+        try:
+            q.put_nowait(item)
+        except queue.Full:
+            pass
+
+
 class YOLOProcessor:
     """
-    Runs YOLO inference in a dedicated background thread (mirrors the example
-    yolo/run.py pattern). The worker calls result.plot() to produce a fully
-    annotated frame and caches it. recv() picks up that pre-drawn frame with
-    zero per-frame drawing overhead on the main loop.
+    Two-thread pipeline mirroring example/go2/src/yolo/run.py:
+      capture (video.py) -> frame_queue -> _inference_worker
+    recv() draws the last-known detections onto the CURRENT camera frame so
+    the WebRTC stream always flows at camera FPS, never frozen between YOLO runs.
     """
 
     def __init__(self):
         self.enabled = False
-        self._lock = threading.Lock()
-        self._pending_frame = None
-        self._latest_annotated = None
+        # maxsize=1: inference_worker always processes the freshest frame
+        self._frame_queue = queue.Queue(maxsize=1)
         self._detections = []
-        self._thread = threading.Thread(target=self._worker, daemon=True)
+        self._det_lock = threading.Lock()
+        self._thread = threading.Thread(target=self._inference_worker, daemon=True)
         self._thread.start()
 
     def submit(self, frame):
-        """Submit a frame for background detection. Always keeps only the newest."""
+        """Push a frame for inference. Drops the previous pending frame if not yet consumed."""
         if not self.enabled or _model is None:
             return
-        with self._lock:
-            self._pending_frame = frame.copy()
+        _safe_put(self._frame_queue, frame)
 
-    def get_latest(self, raw_frame):
-        """
-        Return (annotated_frame, detections).
-        If a YOLO result is ready, returns the pre-drawn annotated frame.
-        Otherwise returns raw_frame unmodified.
-        """
-        with self._lock:
-            annotated = self._latest_annotated
-            detections = list(self._detections)
-        if annotated is not None:
-            return annotated, detections
-        return raw_frame, detections
-
-    def _worker(self):
+    def _inference_worker(self):
+        """Mirrors inference_worker from example/go2/src/yolo/run.py."""
         while True:
-            frame = None
-            with self._lock:
-                if self._pending_frame is not None:
-                    frame = self._pending_frame
-                    self._pending_frame = None
+            try:
+                img = self._frame_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            try:
+                results = _model(img, verbose=False)
+                result = results[0]
+                detections = []
+                for box in result.boxes:
+                    cls_id = int(box.cls[0])
+                    conf = float(box.conf[0])
+                    cls_name = _model.names[cls_id]
+                    x1, y1, x2, y2 = box.xyxy[0].tolist()
+                    detections.append({
+                        "class": cls_name,
+                        "conf": conf,
+                        "bbox": (int(x1), int(y1), int(x2), int(y2)),
+                    })
+                with self._det_lock:
+                    self._detections = detections
+            except Exception as e:
+                logger.error(f"YOLO worker error: {e}")
 
-            if frame is not None:
-                try:
-                    results = _model(frame, verbose=False)
-                    result = results[0]
-                    # Use YOLO's native renderer — same as example inference_worker
-                    try:
-                        annotated = result.plot()
-                    except Exception:
-                        annotated = frame
-                    detections = []
-                    for box in result.boxes:
-                        cls_id = int(box.cls[0])
-                        conf = float(box.conf[0])
-                        cls_name = _model.names[cls_id]
-                        x1, y1, x2, y2 = box.xyxy[0].tolist()
-                        detections.append({
-                            "class": cls_name,
-                            "conf": conf,
-                            "bbox": (int(x1), int(y1), int(x2), int(y2)),
-                        })
-                    with self._lock:
-                        self._latest_annotated = annotated
-                        self._detections = detections
-                except Exception as e:
-                    logger.error(f"YOLO worker error: {e}")
-            else:
-                time.sleep(0.001)
+    def draw(self, frame):
+        """
+        Draw last-known detections onto the CURRENT camera frame.
+        Always returns a live frame — never a stale frozen one.
+        """
+        with self._det_lock:
+            detections = self._detections
+        if not detections:
+            return frame, []
+        out = frame.copy()
+        for det in detections:
+            x1, y1, x2, y2 = det["bbox"]
+            label = f"{det['class']} {det['conf']:.2f}"
+            cv2.rectangle(out, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(out, label, (x1, max(y1 - 10, 10)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        return out, list(detections)
 
     def stop(self):
         pass

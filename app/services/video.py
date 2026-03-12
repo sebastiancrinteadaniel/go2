@@ -79,7 +79,7 @@ class CameraStreamTrack(VideoStreamTrack):
         self.current_fps = self.fps_calc.get()
 
         self.yolo_processor.submit(frame)
-        frame, self.latest_detections = self.yolo_processor.get_latest(frame)
+        frame, self.latest_detections = self.yolo_processor.draw(frame)
 
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -167,7 +167,7 @@ class Go2CameraStreamTrack(VideoStreamTrack):
         self.current_fps = self.fps_calc.get()
 
         self.yolo_processor.submit(frame)
-        frame, self.latest_detections = self.yolo_processor.get_latest(frame)
+        frame, self.latest_detections = self.yolo_processor.draw(frame)
 
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
