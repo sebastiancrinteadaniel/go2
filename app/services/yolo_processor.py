@@ -32,16 +32,21 @@ class YOLOProcessor:
     """
     Two-thread pipeline mirroring example/go2/src/yolo/run.py:
       capture (video.py) -> frame_queue -> _inference_worker
-    recv() draws the last-known detections onto the CURRENT camera frame so
-    the WebRTC stream always flows at camera FPS, never frozen between YOLO runs.
+
+    Worker calls result.plot() so boxes are baked into the frame they were
+    detected on (always visually in sync). draw() returns that pre-annotated
+    frame — same as the example's `last_vis` pattern — so boxes never drift
+    against a moving subject.
     """
 
     def __init__(self):
         self.enabled = False
-        # maxsize=1: inference_worker always processes the freshest frame
+        # maxsize=1: always process the freshest frame, drop stale ones
         self._frame_queue = queue.Queue(maxsize=1)
-        self._detections = []
-        self._det_lock = threading.Lock()
+        # Latest pre-annotated frame from result.plot() + its detections
+        self._latest_annotated = None
+        self._latest_detections = []
+        self._result_lock = threading.Lock()
         self._thread = threading.Thread(target=self._inference_worker, daemon=True)
         self._thread.start()
 
@@ -61,6 +66,11 @@ class YOLOProcessor:
             try:
                 results = _model(img, verbose=False)
                 result = results[0]
+                # Bake boxes into the frame — same as example's result.plot()
+                try:
+                    annotated = result.plot()
+                except Exception:
+                    annotated = img
                 detections = []
                 for box in result.boxes:
                     cls_id = int(box.cls[0])
@@ -72,28 +82,25 @@ class YOLOProcessor:
                         "conf": conf,
                         "bbox": (int(x1), int(y1), int(x2), int(y2)),
                     })
-                with self._det_lock:
-                    self._detections = detections
+                with self._result_lock:
+                    self._latest_annotated = annotated
+                    self._latest_detections = detections
             except Exception as e:
                 logger.error(f"YOLO worker error: {e}")
 
-    def draw(self, frame):
+    def draw(self, raw_frame):
         """
-        Draw last-known detections onto the CURRENT camera frame.
-        Always returns a live frame — never a stale frozen one.
+        Return (frame_to_send, detections).
+        If a YOLO result exists, returns the pre-annotated frame where boxes are
+        baked in — boxes are always aligned to the image they were detected on.
+        Falls back to raw_frame before the first inference completes.
         """
-        with self._det_lock:
-            detections = self._detections
-        if not detections:
-            return frame, []
-        out = frame.copy()
-        for det in detections:
-            x1, y1, x2, y2 = det["bbox"]
-            label = f"{det['class']} {det['conf']:.2f}"
-            cv2.rectangle(out, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(out, label, (x1, max(y1 - 10, 10)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        return out, list(detections)
+        with self._result_lock:
+            annotated = self._latest_annotated
+            detections = list(self._latest_detections)
+        if annotated is not None:
+            return annotated, detections
+        return raw_frame, []
 
     def stop(self):
         pass
