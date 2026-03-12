@@ -1,6 +1,8 @@
 import asyncio
 import cv2
 import logging
+import threading
+import time
 from collections import deque
 
 import numpy as np
@@ -31,6 +33,8 @@ class CvFpsCalc:
 class CameraStreamTrack(VideoStreamTrack):
     """
     A video stream track that reads frames from a local web camera.
+    Camera capture runs in a background thread (mirrors the example capture_loop
+    pattern) so recv() never blocks on I/O and can run at the WebRTC target FPS.
     """
 
     def __init__(self):
@@ -48,14 +52,29 @@ class CameraStreamTrack(VideoStreamTrack):
         self.fps_calc = CvFpsCalc(buffer_len=10)
         self.current_fps = 0.0
 
+        # Single-slot frame buffer — always holds the freshest camera frame
+        self._frame_lock = threading.Lock()
+        self._latest_frame = np.zeros(
+            (settings.CAMERA_HEIGHT, settings.CAMERA_WIDTH, 3), dtype=np.uint8
+        )
+        self._reader_thread = threading.Thread(target=self._capture_loop, daemon=True)
+        self._reader_thread.start()
+
+    def _capture_loop(self):
+        """Continuously reads camera frames and caches the latest one."""
+        while True:
+            ret, frame = self.cap.read()
+            if ret and frame is not None:
+                with self._frame_lock:
+                    self._latest_frame = frame
+            else:
+                time.sleep(0.005)
+
     async def recv(self):
         pts, time_base = await self.next_timestamp()
 
-        loop = asyncio.get_event_loop()
-        ret, frame = await loop.run_in_executor(None, self.cap.read)
-
-        if not ret or frame is None:
-            frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        with self._frame_lock:
+            frame = self._latest_frame.copy()
 
         self.current_fps = self.fps_calc.get()
 
@@ -101,34 +120,49 @@ class Go2CameraStreamTrack(VideoStreamTrack):
         self.fps_calc = CvFpsCalc(buffer_len=10)
         self.current_fps = 0.0
 
-    async def recv(self):
-        pts, time_base = await self.next_timestamp()
+        # Single-slot frame buffer — always holds the freshest robot camera frame
+        self._frame_lock = threading.Lock()
+        self._offline_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.putText(
+            self._offline_frame,
+            "GO2 CAMERA UNAVAILABLE",
+            (50, 240),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0, 0, 255),
+            2,
+            cv2.LINE_AA,
+        )
+        self._latest_frame = self._offline_frame.copy()
+        self._reader_thread = threading.Thread(target=self._capture_loop, daemon=True)
+        self._reader_thread.start()
 
-        frame = None
-        if self.connected:
-            loop = asyncio.get_event_loop()
+    def _capture_loop(self):
+        """Continuously reads Go2 camera frames and caches the latest one."""
+        while True:
+            if not self.connected:
+                time.sleep(0.05)
+                continue
             try:
-                code, data = await loop.run_in_executor(None, self.client.GetImageSample)
+                code, data = self.client.GetImageSample()
                 if code == 0:
                     image_data = np.frombuffer(bytes(data), dtype=np.uint8)
                     frame = cv2.imdecode(image_data, cv2.IMREAD_COLOR)
+                    if frame is not None:
+                        with self._frame_lock:
+                            self._latest_frame = frame
                 else:
                     logger.warning(f"Get image sample error. code: {code}")
+                    time.sleep(0.005)
             except Exception as e:
                 logger.error(f"Error getting Go2 image: {e}")
+                time.sleep(0.05)
 
-        if frame is None:
-            frame = np.zeros((480, 640, 3), dtype=np.uint8)
-            cv2.putText(
-                frame,
-                "GO2 CAMERA UNAVAILABLE",
-                (50, 240),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (0, 0, 255),
-                2,
-                cv2.LINE_AA,
-            )
+    async def recv(self):
+        pts, time_base = await self.next_timestamp()
+
+        with self._frame_lock:
+            frame = self._latest_frame.copy()
 
         self.current_fps = self.fps_calc.get()
 
