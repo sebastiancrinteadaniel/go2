@@ -10,6 +10,7 @@ from av import VideoFrame
 from app.core.config import settings
 
 from app.services.yolo_processor import YOLOProcessor
+from app.services.gesture_processor import GestureProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,9 @@ class CameraStreamTrack(VideoStreamTrack):
         self.cap.set(cv2.CAP_PROP_FPS, settings.CAMERA_FPS)
 
         self.yolo_processor = YOLOProcessor()
+        self.gesture_processor = GestureProcessor()
         self.latest_detections = []
+        self.latest_gestures = []
         self.fps_calc = CvFpsCalc(buffer_len=10)
         self.current_fps = 0.0
 
@@ -61,6 +64,7 @@ class CameraStreamTrack(VideoStreamTrack):
             (settings.CAMERA_HEIGHT, settings.CAMERA_WIDTH, 3), dtype=np.uint8
         )
         self._last_detections: list = []
+        self._last_gestures: list = []
 
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
@@ -76,25 +80,36 @@ class CameraStreamTrack(VideoStreamTrack):
 
     def _inference_loop(self) -> None:
         self.yolo_processor.warmup()
+        self.gesture_processor.warmup()
         while not self._stop_event.is_set():
             try:
                 frame = self._frame_queue.get(timeout=0.1)
             except queue.Empty:
                 continue
-            annotated, detections = self.yolo_processor.process(frame)
-            _safe_put(self._result_queue, (annotated, detections))
+            if self.yolo_processor.enabled:
+                annotated, detections = self.yolo_processor.process(frame)
+            else:
+                annotated, detections = frame, []
+            if self.gesture_processor.enabled:
+                annotated, gestures = self.gesture_processor.process(annotated)
+            else:
+                gestures = []
+            _safe_put(self._result_queue, (annotated, detections, gestures))
 
     async def recv(self):
         pts, time_base = await self.next_timestamp()
         try:
-            frame, detections = self._result_queue.get_nowait()
+            frame, detections, gestures = self._result_queue.get_nowait()
             self._last_frame = frame
             self._last_detections = detections
+            self._last_gestures = gestures
         except queue.Empty:
             frame = self._last_frame
             detections = self._last_detections
+            gestures = self._last_gestures
 
         self.latest_detections = detections
+        self.latest_gestures = gestures
         self.current_fps = self.fps_calc.get()
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         new_frame = VideoFrame.from_ndarray(frame, format="rgb24")
@@ -104,6 +119,7 @@ class CameraStreamTrack(VideoStreamTrack):
 
     def stop(self):
         self._stop_event.set()
+        self.gesture_processor.stop()
         super().stop()
 
 
@@ -126,7 +142,9 @@ class Go2CameraStreamTrack(VideoStreamTrack):
             logger.error(f"Error initializing Go2 VideoClient: {e}")
 
         self.yolo_processor = YOLOProcessor()
+        self.gesture_processor = GestureProcessor()
         self.latest_detections = []
+        self.latest_gestures = []
         self.fps_calc = CvFpsCalc(buffer_len=10)
         self.current_fps = 0.0
 
@@ -141,6 +159,7 @@ class Go2CameraStreamTrack(VideoStreamTrack):
         self._result_queue: queue.Queue = queue.Queue(maxsize=3)
         self._last_frame: np.ndarray = self._offline_frame.copy()
         self._last_detections: list = []
+        self._last_gestures: list = []
 
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
@@ -166,25 +185,36 @@ class Go2CameraStreamTrack(VideoStreamTrack):
 
     def _inference_loop(self) -> None:
         self.yolo_processor.warmup()
+        self.gesture_processor.warmup()
         while not self._stop_event.is_set():
             try:
                 frame = self._frame_queue.get(timeout=0.1)
             except queue.Empty:
                 continue
-            annotated, detections = self.yolo_processor.process(frame)
-            _safe_put(self._result_queue, (annotated, detections))
+            if self.yolo_processor.enabled:
+                annotated, detections = self.yolo_processor.process(frame)
+            else:
+                annotated, detections = frame, []
+            if self.gesture_processor.enabled:
+                annotated, gestures = self.gesture_processor.process(annotated)
+            else:
+                gestures = []
+            _safe_put(self._result_queue, (annotated, detections, gestures))
 
     async def recv(self):
         pts, time_base = await self.next_timestamp()
         try:
-            frame, detections = self._result_queue.get_nowait()
+            frame, detections, gestures = self._result_queue.get_nowait()
             self._last_frame = frame
             self._last_detections = detections
+            self._last_gestures = gestures
         except queue.Empty:
             frame = self._last_frame
             detections = self._last_detections
+            gestures = self._last_gestures
 
         self.latest_detections = detections
+        self.latest_gestures = gestures
         self.current_fps = self.fps_calc.get()
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         new_frame = VideoFrame.from_ndarray(frame, format="rgb24")
@@ -194,4 +224,5 @@ class Go2CameraStreamTrack(VideoStreamTrack):
 
     def stop(self):
         self._stop_event.set()
+        self.gesture_processor.stop()
         super().stop()

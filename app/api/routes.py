@@ -53,6 +53,7 @@ async def offer(request: Request):
                     uptime_seconds = int(time.time() - psutil.boot_time())
                     fps = getattr(camera_track, "current_fps", 0.0)
                     detections = getattr(camera_track, "latest_detections", [])
+                    gestures = getattr(camera_track, "latest_gestures", [])
                     
                     data = json.dumps({
                         "type": "stats", 
@@ -60,6 +61,7 @@ async def offer(request: Request):
                         "ram_percent": ram.percent, 
                         "uptime": uptime_seconds, 
                         "detections": detections, 
+                        "gestures": gestures,
                         "fps": fps,
                         "battery": telemetry.battery_soc,
                         "connected": telemetry.connected and ((time.time() - telemetry.last_update) < 2.0),
@@ -83,6 +85,8 @@ async def offer(request: Request):
                 channel.send("pong")
             elif message == "toggle_yolo":
                 camera_track.yolo_processor.enabled = not camera_track.yolo_processor.enabled
+            elif message == "toggle_gesture":
+                camera_track.gesture_processor.enabled = not camera_track.gesture_processor.enabled
 
     mode = params.get("mode", "hd_view")
 

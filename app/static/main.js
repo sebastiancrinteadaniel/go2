@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const loadingOverlay = document.getElementById("loading-overlay");
   const videoFeed = document.getElementById("live-feed");
   const yoloBtn = document.getElementById("yolo-btn");
+  const gestureBtn = document.getElementById("gesture-btn");
 
   const camFps = document.getElementById("cam-fps");
   const camLatency = document.getElementById("cam-latency");
@@ -24,6 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let isConnected = false;
   let isRecording = false;
   let isYoloEnabled = false;
+  let isGestureEnabled = false;
   let telemetryInterval;
 
   let pc = null;
@@ -67,20 +69,36 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function setToggleButtonState(button, enabled) {
+    if (!button) return;
+
+    if (enabled) {
+      button.style.color = "#fff";
+      button.style.borderColor = "var(--accent-blue)";
+      button.style.background = "var(--accent-blue)";
+    } else {
+      button.style.color = "";
+      button.style.borderColor = "";
+      button.style.background = "";
+    }
+  }
+
   if (yoloBtn) {
     yoloBtn.addEventListener("click", () => {
       isYoloEnabled = !isYoloEnabled;
-      if (isYoloEnabled) {
-        yoloBtn.style.color = "#fff";
-        yoloBtn.style.borderColor = "var(--accent-blue)";
-        yoloBtn.style.background = "var(--accent-blue)";
-      } else {
-        yoloBtn.style.color = "";
-        yoloBtn.style.borderColor = "";
-        yoloBtn.style.background = "";
-      }
+      setToggleButtonState(yoloBtn, isYoloEnabled);
       if (dc && dc.readyState === "open") {
         dc.send("toggle_yolo");
+      }
+    });
+  }
+
+  if (gestureBtn) {
+    gestureBtn.addEventListener("click", () => {
+      isGestureEnabled = !isGestureEnabled;
+      setToggleButtonState(gestureBtn, isGestureEnabled);
+      if (dc && dc.readyState === "open") {
+        dc.send("toggle_gesture");
       }
     });
   }
@@ -110,10 +128,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (yoloBtn) {
           yoloBtn.style.display = "flex";
+          setToggleButtonState(yoloBtn, isYoloEnabled);
+        }
+
+        if (gestureBtn) {
+          gestureBtn.style.display = "flex";
+          setToggleButtonState(gestureBtn, isGestureEnabled);
         }
 
         if (isYoloEnabled) {
           dc.send("toggle_yolo");
+        }
+
+        if (isGestureEnabled) {
+          dc.send("toggle_gesture");
         }
 
         startTelemetry();
@@ -136,8 +164,12 @@ document.addEventListener("DOMContentLoaded", () => {
               const seconds = Math.floor(data.uptime % 60);
               sysUptime.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }
-            if (data.detections && componentList) {
-              updateDetections(data.detections);
+            if (componentList) {
+              const merged = [
+                ...(data.detections || []),
+                ...(data.gestures || []),
+              ];
+              updateDetections(merged);
             }
             if (camFps && data.fps !== undefined) {
               camFps.textContent = data.fps.toFixed(1);
@@ -228,6 +260,10 @@ document.addEventListener("DOMContentLoaded", () => {
         yoloBtn.style.display = "none";
       }
 
+      if (gestureBtn) {
+        gestureBtn.style.display = "none";
+      }
+
       if (videoFeed.srcObject) {
         videoFeed.srcObject.getTracks().forEach((track) => track.stop());
         videoFeed.srcObject = null;
@@ -310,8 +346,12 @@ document.addEventListener("DOMContentLoaded", () => {
     // Group detections by class name and get the highest confidence
     const uniqueDets = {};
     detections.forEach((d) => {
+      if (!d.class) return;
       // Capitalize the class name nicely
-      const clsName = d.class.charAt(0).toUpperCase() + d.class.slice(1);
+      const readableName = d.class
+        .replace("gesture:", "Gesture ")
+        .replace(/_/g, " ");
+      const clsName = readableName.charAt(0).toUpperCase() + readableName.slice(1);
       if (!uniqueDets[clsName] || uniqueDets[clsName] < d.conf) {
         uniqueDets[clsName] = d.conf;
       }
