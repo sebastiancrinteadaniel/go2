@@ -19,14 +19,21 @@ class GestureDispatcher:
         self,
         enabled: bool = True,
         cooldown_seconds: float = 2.0,
+        global_cooldown_seconds: Optional[float] = None,
         min_confidence: float = 0.75,
         min_stable_frames: int = 3,
     ):
         self.enabled = enabled
         self._cooldown_seconds = max(0.0, float(cooldown_seconds))
+        # Use the same cooldown by default, but allow overriding global action throttling.
+        if global_cooldown_seconds is None:
+            self._global_cooldown_seconds = self._cooldown_seconds
+        else:
+            self._global_cooldown_seconds = max(0.0, float(global_cooldown_seconds))
         self._min_confidence = max(0.0, min(1.0, float(min_confidence)))
         self._min_stable_frames = max(1, int(min_stable_frames))
         self._last_run: Dict[str, float] = {}
+        self._last_run_any = 0.0
         self._lock = threading.Lock()
         self._action_lock = threading.Lock()
         self._candidate_label = ""
@@ -52,8 +59,9 @@ class GestureDispatcher:
                 "peacesign": self._action_peace_sign,
             }
             logger.info(
-                "Gesture dispatcher initialized (cooldown=%.2fs, min_confidence=%.2f, min_stable_frames=%d).",
+                "Gesture dispatcher initialized (cooldown=%.2fs, global_cooldown=%.2fs, min_confidence=%.2f, min_stable_frames=%d).",
                 self._cooldown_seconds,
+                self._global_cooldown_seconds,
                 self._min_confidence,
                 self._min_stable_frames,
             )
@@ -102,10 +110,13 @@ class GestureDispatcher:
 
         now = time.time()
         with self._lock:
+            if now - self._last_run_any < self._global_cooldown_seconds:
+                return
             last = self._last_run.get(best_label, 0.0)
             if now - last < self._cooldown_seconds:
                 return
             self._last_run[best_label] = now
+            self._last_run_any = now
 
         if not self._action_lock.acquire(blocking=False):
             logger.debug("Skipping gesture %s because another action is still running.", best_label)

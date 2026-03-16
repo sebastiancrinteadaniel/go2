@@ -151,6 +151,7 @@ class Go2CameraStreamTrack(VideoStreamTrack):
         self.gesture_dispatcher = GestureDispatcher(
             enabled=True,
             cooldown_seconds=settings.GESTURE_DISPATCH_COOLDOWN,
+            global_cooldown_seconds=settings.GESTURE_DISPATCH_GLOBAL_COOLDOWN,
             min_confidence=settings.GESTURE_DISPATCH_MIN_CONFIDENCE,
             min_stable_frames=settings.GESTURE_DISPATCH_MIN_STABLE_FRAMES,
         )
