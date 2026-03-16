@@ -21,7 +21,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const sysConnection = document.getElementById("sys-connection");
   const sysTelemetry = document.getElementById("sys-telemetry");
   const sysPeakTemp = document.getElementById("sys-peak-temp");
-  const travelSpeedVal = document.getElementById("travel-speed-val");
   const componentList = document.getElementById("component-list");
 
   // State
@@ -251,13 +250,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 sysConnection.parentElement.classList.add("accent-red");
               }
             }
-            if (travelSpeedVal) {
-              const speed = Number(data.travel_speed_mps);
-              travelSpeedVal.textContent = Number.isFinite(speed)
-                ? `${speed.toFixed(2)} m/s`
-                : "-- m/s";
-            }
-
             if (currentMode === "go2" && data.gesture_dispatch_enabled !== undefined) {
               isGestureDispatchEnabled = !!data.gesture_dispatch_enabled;
               setToggleButtonState(gestureDispatchBtn, isGestureDispatchEnabled);
@@ -414,9 +406,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (sysPeakTemp) {
       sysPeakTemp.textContent = "-- °C (--)";
-    }
-    if (travelSpeedVal) {
-      travelSpeedVal.textContent = "-- m/s";
     }
 
     // Reset pose values

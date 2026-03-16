@@ -92,7 +92,6 @@ async def offer(request: Request):
                         "avg_temp_c": avg_temp_c,
                         "peak_temp_c": peak_temp_c,
                         "peak_joint_name": peak_joint_name,
-                        "travel_speed_mps": telemetry.travel_speed_mps,
                     })
                     try:
                         channel.send(data)
