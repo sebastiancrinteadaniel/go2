@@ -63,15 +63,24 @@ class GestureProcessor:
     def _setup_mediapipe(self) -> None:
         if mp is None:
             return
-        self._mp_hands = mp.solutions.hands
+        if not hasattr(mp, "solutions"):
+            logger.warning("mediapipe.solutions is unavailable in this mediapipe build. Gesture inference disabled.")
+            return
+
+        try:
+            self._mp_hands = mp.solutions.hands
+            self._mp_draw = mp.solutions.drawing_utils
+        except Exception as e:
+            logger.warning(f"MediaPipe Hands API unavailable: {e}")
+            return
+
         self._hands = self._mp_hands.Hands(
             static_image_mode=False,
-            max_num_hands=2,
+            max_num_hands=10,
             model_complexity=0,
             min_detection_confidence=0.8,
             min_tracking_confidence=0.5,
         )
-        self._mp_draw = mp.solutions.drawing_utils
         self._point_style = self._mp_draw.DrawingSpec(
             color=self._POINT_COLOR, thickness=2, circle_radius=4
         )

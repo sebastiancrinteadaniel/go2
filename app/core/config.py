@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     CAMERA_HEIGHT: int = 1080
     CAMERA_FPS: int = 30
 
+    GESTURE_DISPATCH_COOLDOWN: float = 2.0
+    GESTURE_DISPATCH_MIN_CONFIDENCE: float = 0.75
+    GESTURE_DISPATCH_MIN_STABLE_FRAMES: int = 3
+
 
 settings = Settings()
 

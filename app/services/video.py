@@ -11,6 +11,7 @@ from app.core.config import settings
 
 from app.services.yolo_processor import YOLOProcessor
 from app.services.gesture_processor import GestureProcessor
+from app.services.gesture_dispatcher import GestureDispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,6 @@ def _safe_put(q: queue.Queue, item) -> None:
 
 
 class CameraStreamTrack(VideoStreamTrack):
-
     def __init__(self):
         super().__init__()
         self.cap = cv2.VideoCapture(0)
@@ -68,7 +68,9 @@ class CameraStreamTrack(VideoStreamTrack):
 
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
-        self._inference_thread = threading.Thread(target=self._inference_loop, daemon=True)
+        self._inference_thread = threading.Thread(
+            target=self._inference_loop, daemon=True
+        )
         self._inference_thread.start()
 
     def _capture_loop(self) -> None:
@@ -94,6 +96,7 @@ class CameraStreamTrack(VideoStreamTrack):
                 annotated, gestures = self.gesture_processor.process(annotated)
             else:
                 gestures = []
+
             _safe_put(self._result_queue, (annotated, detections, gestures))
 
     async def recv(self):
@@ -124,11 +127,11 @@ class CameraStreamTrack(VideoStreamTrack):
 
 
 class Go2CameraStreamTrack(VideoStreamTrack):
-
     def __init__(self):
         super().__init__()
         try:
             from unitree_sdk2py.go2.video.video_client import VideoClient
+
             self.client = VideoClient()
             self.client.SetTimeout(3.0)
             self.client.Init()
@@ -136,13 +139,21 @@ class Go2CameraStreamTrack(VideoStreamTrack):
             logger.info("Unitree SDK VideoClient initialized successfully.")
         except ImportError:
             self.connected = False
-            logger.warning("'unitree_sdk2py' not found. Ensure it is installed for the Go2 camera stream to work.")
+            logger.warning(
+                "'unitree_sdk2py' not found. Ensure it is installed for the Go2 camera stream to work."
+            )
         except Exception as e:
             self.connected = False
             logger.error(f"Error initializing Go2 VideoClient: {e}")
 
         self.yolo_processor = YOLOProcessor()
         self.gesture_processor = GestureProcessor()
+        self.gesture_dispatcher = GestureDispatcher(
+            enabled=True,
+            cooldown_seconds=settings.GESTURE_DISPATCH_COOLDOWN,
+            min_confidence=settings.GESTURE_DISPATCH_MIN_CONFIDENCE,
+            min_stable_frames=settings.GESTURE_DISPATCH_MIN_STABLE_FRAMES,
+        )
         self.latest_detections = []
         self.latest_gestures = []
         self.fps_calc = CvFpsCalc(buffer_len=10)
@@ -150,8 +161,14 @@ class Go2CameraStreamTrack(VideoStreamTrack):
 
         self._offline_frame = np.zeros((480, 640, 3), dtype=np.uint8)
         cv2.putText(
-            self._offline_frame, "GO2 CAMERA UNAVAILABLE",
-            (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA,
+            self._offline_frame,
+            "GO2 CAMERA UNAVAILABLE",
+            (50, 240),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0, 0, 255),
+            2,
+            cv2.LINE_AA,
         )
 
         self._stop_event = threading.Event()
@@ -163,7 +180,9 @@ class Go2CameraStreamTrack(VideoStreamTrack):
 
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
-        self._inference_thread = threading.Thread(target=self._inference_loop, daemon=True)
+        self._inference_thread = threading.Thread(
+            target=self._inference_loop, daemon=True
+        )
         self._inference_thread.start()
 
     def _capture_loop(self) -> None:
@@ -199,6 +218,9 @@ class Go2CameraStreamTrack(VideoStreamTrack):
                 annotated, gestures = self.gesture_processor.process(annotated)
             else:
                 gestures = []
+
+            self.gesture_dispatcher.process(gestures)
+
             _safe_put(self._result_queue, (annotated, detections, gestures))
 
     async def recv(self):

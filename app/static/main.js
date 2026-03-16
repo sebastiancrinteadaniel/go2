@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const videoFeed = document.getElementById("live-feed");
   const yoloBtn = document.getElementById("yolo-btn");
   const gestureBtn = document.getElementById("gesture-btn");
+  const gestureDispatchBtn = document.getElementById("gesture-dispatch-btn");
 
   const camFps = document.getElementById("cam-fps");
   const camLatency = document.getElementById("cam-latency");
@@ -26,7 +27,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let isRecording = false;
   let isYoloEnabled = false;
   let isGestureEnabled = false;
+  let isGestureDispatchEnabled = true;
   let telemetryInterval;
+  let currentMode = "hd_view";
 
   let pc = null;
   let dc = null;
@@ -103,6 +106,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  if (gestureDispatchBtn) {
+    gestureDispatchBtn.addEventListener("click", () => {
+      isGestureDispatchEnabled = !isGestureDispatchEnabled;
+      setToggleButtonState(gestureDispatchBtn, isGestureDispatchEnabled);
+      if (dc && dc.readyState === "open") {
+        dc.send("toggle_gesture_dispatch");
+      }
+    });
+  }
+
   // Connect Button Handling
   connectBtn.addEventListener("click", () => {
     if (!isConnected) {
@@ -134,6 +147,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (gestureBtn) {
           gestureBtn.style.display = "flex";
           setToggleButtonState(gestureBtn, isGestureEnabled);
+        }
+
+        if (gestureDispatchBtn) {
+          if (currentMode === "go2") {
+            gestureDispatchBtn.style.display = "flex";
+            setToggleButtonState(gestureDispatchBtn, isGestureDispatchEnabled);
+          } else {
+            gestureDispatchBtn.style.display = "none";
+          }
         }
 
         if (isYoloEnabled) {
@@ -188,6 +210,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 sysConnection.parentElement.classList.add("accent-red");
               }
             }
+
+            if (currentMode === "go2" && data.gesture_dispatch_enabled !== undefined) {
+              isGestureDispatchEnabled = !!data.gesture_dispatch_enabled;
+              setToggleButtonState(gestureDispatchBtn, isGestureDispatchEnabled);
+            }
           }
         } catch (e) {
           // Ignore non-json
@@ -216,6 +243,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
       });
+      currentMode = selectedMode;
 
       pc.createOffer()
         .then((offer) => pc.setLocalDescription(offer))
@@ -262,6 +290,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (gestureBtn) {
         gestureBtn.style.display = "none";
+      }
+
+      if (gestureDispatchBtn) {
+        gestureDispatchBtn.style.display = "none";
       }
 
       if (videoFeed.srcObject) {

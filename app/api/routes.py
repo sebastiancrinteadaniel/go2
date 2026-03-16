@@ -63,6 +63,7 @@ async def offer(request: Request):
                         "detections": detections, 
                         "gestures": gestures,
                         "fps": fps,
+                        "gesture_dispatch_enabled": getattr(getattr(camera_track, "gesture_dispatcher", None), "enabled", False),
                         "battery": telemetry.battery_soc,
                         "connected": telemetry.connected and ((time.time() - telemetry.last_update) < 2.0),
                         "motor_temps": telemetry.motor_temps
@@ -87,6 +88,14 @@ async def offer(request: Request):
                 camera_track.yolo_processor.enabled = not camera_track.yolo_processor.enabled
             elif message == "toggle_gesture":
                 camera_track.gesture_processor.enabled = not camera_track.gesture_processor.enabled
+            elif message == "toggle_gesture_dispatch":
+                dispatcher = getattr(camera_track, "gesture_dispatcher", None)
+                if dispatcher is not None:
+                    dispatcher.enabled = not dispatcher.enabled
+                    logger.info(
+                        "Gesture dispatch %s",
+                        "enabled" if dispatcher.enabled else "disabled",
+                    )
 
     mode = params.get("mode", "hd_view")
 
