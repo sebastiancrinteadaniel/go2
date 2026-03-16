@@ -16,6 +16,13 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+JOINT_NAMES = [
+    "FR_0", "FR_1", "FR_2",
+    "FL_0", "FL_1", "FL_2",
+    "RR_0", "RR_1", "RR_2",
+    "RL_0", "RL_1", "RL_2",
+]
+
 
 @router.get("/", response_class=HTMLResponse)
 async def index():
@@ -60,8 +67,15 @@ async def offer(request: Request):
                         if motor_temps
                         else None
                     )
-                    max_temp_c = max(motor_temps) if motor_temps else None
-                    power_w = telemetry.power_v * telemetry.power_a
+                    peak_temp_c = max(motor_temps) if motor_temps else None
+                    peak_joint_name = None
+                    if motor_temps:
+                        peak_idx = max(range(len(motor_temps)), key=lambda i: motor_temps[i])
+                        peak_joint_name = (
+                            JOINT_NAMES[peak_idx]
+                            if peak_idx < len(JOINT_NAMES)
+                            else f"J{peak_idx}"
+                        )
                     
                     data = json.dumps({
                         "type": "stats", 
@@ -76,26 +90,8 @@ async def offer(request: Request):
                         "connected": telemetry.connected and ((time.time() - telemetry.last_update) < 2.0),
                         "motor_temps": motor_temps,
                         "avg_temp_c": avg_temp_c,
-                        "max_temp_c": max_temp_c,
-                        "power_v": telemetry.power_v,
-                        "power_a": telemetry.power_a,
-                        "power_w": power_w,
-                        "battery_cycle": telemetry.battery_cycle,
-                        "cell_min_v": telemetry.cell_min_v,
-                        "cell_max_v": telemetry.cell_max_v,
-                        "imu_rpy": telemetry.imu_rpy,
-                        "imu_gyro": telemetry.imu_gyro,
-                        "imu_accel": telemetry.imu_accel,
-                        "imu_temp_c": telemetry.imu_temp_c,
-                        "joint_hottest_index": telemetry.joint_hottest_index,
-                        "joint_hottest_temp_c": telemetry.joint_hottest_temp_c,
-                        "joint_lost_count": telemetry.joint_lost_count,
-                        "joint_avg_tau": telemetry.joint_avg_tau,
-                        "foot_force": telemetry.foot_force,
-                        "foot_force_est": telemetry.foot_force_est,
-                        "temp_ntc1_c": telemetry.temp_ntc1_c,
-                        "temp_ntc2_c": telemetry.temp_ntc2_c,
-                        "velocity_xyz": telemetry.velocity_xyz,
+                        "peak_temp_c": peak_temp_c,
+                        "peak_joint_name": peak_joint_name,
                         "travel_speed_mps": telemetry.travel_speed_mps,
                     })
                     try:

@@ -20,22 +20,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const sysBattery = document.getElementById("sys-battery");
   const sysConnection = document.getElementById("sys-connection");
   const sysTelemetry = document.getElementById("sys-telemetry");
-  const componentList = document.getElementById("component-list");
-  const rtPower = document.getElementById("rt-power");
-  const rtCycle = document.getElementById("rt-cycle");
-  const rtCellRange = document.getElementById("rt-cell-range");
-  const rtRpy = document.getElementById("rt-rpy");
-  const rtGyro = document.getElementById("rt-gyro");
-  const rtAccel = document.getElementById("rt-accel");
-  const rtJointHealth = document.getElementById("rt-joint-health");
-  const rtJointTau = document.getElementById("rt-joint-tau");
-  const rtAvgTemp = document.getElementById("rt-avg-temp");
-  const rtPeakTemp = document.getElementById("rt-peak-temp");
-  const rtNtc = document.getElementById("rt-ntc");
-  const rtImuTemp = document.getElementById("rt-imu-temp");
-  const rtFootForce = document.getElementById("rt-foot-force");
-  const rtFootForceEst = document.getElementById("rt-foot-force-est");
+  const sysPeakTemp = document.getElementById("sys-peak-temp");
   const travelSpeedVal = document.getElementById("travel-speed-val");
+  const componentList = document.getElementById("component-list");
 
   // State
   let isConnected = false;
@@ -50,41 +37,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let dc = null;
   let pingInterval;
   let lastPingTime = 0;
-
-  function formatNumber(value, digits = 1) {
-    const num = Number(value);
-    return Number.isFinite(num) ? num.toFixed(digits) : "--";
-  }
-
-  function formatTriplet(values, digits = 2) {
-    if (!Array.isArray(values) || values.length < 3) return "-- / -- / --";
-    return `${formatNumber(values[0], digits)} / ${formatNumber(values[1], digits)} / ${formatNumber(values[2], digits)}`;
-  }
-
-  function formatQuad(values) {
-    if (!Array.isArray(values) || values.length < 4) return "-- / -- / -- / --";
-    return `${values[0]} / ${values[1]} / ${values[2]} / ${values[3]}`;
-  }
-
-  function resetRobotTelemetryUi() {
-    if (rtPower) rtPower.textContent = "-- V | -- A | -- W";
-    if (rtCycle) rtCycle.textContent = "--";
-    if (rtCellRange) rtCellRange.textContent = "-- V / -- V";
-    if (rtRpy) rtRpy.textContent = "-- / -- / --";
-    if (rtGyro) rtGyro.textContent = "-- / -- / --";
-    if (rtAccel) rtAccel.textContent = "-- / -- / --";
-    if (rtJointHealth) rtJointHealth.textContent = "J-- | -- C | lost --";
-    if (rtJointTau) rtJointTau.textContent = "-- Nm";
-    if (rtAvgTemp) rtAvgTemp.textContent = "-- C";
-    if (rtPeakTemp) rtPeakTemp.textContent = "J-- | -- C";
-    if (rtNtc) rtNtc.textContent = "-- C / -- C";
-    if (rtImuTemp) rtImuTemp.textContent = "-- C";
-    if (rtFootForce) rtFootForce.textContent = "-- / -- / -- / --";
-    if (rtFootForceEst) rtFootForceEst.textContent = "-- / -- / -- / --";
-    if (travelSpeedVal) travelSpeedVal.textContent = "-- m/s";
-  }
-
-  resetRobotTelemetryUi();
 
   // Initialize modes
   const modeBadges = document.querySelectorAll(".mode-badge");
@@ -267,6 +219,27 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
               }
             }
+            if (sysPeakTemp) {
+              const peakTemp = Number(data.peak_temp_c);
+              const peakJoint = typeof data.peak_joint_name === "string" && data.peak_joint_name
+                ? data.peak_joint_name
+                : "--";
+              if (Number.isFinite(peakTemp)) {
+                sysPeakTemp.textContent = `${peakTemp.toFixed(1)} °C (${peakJoint})`;
+              } else {
+                const temps = Array.isArray(data.motor_temps)
+                  ? data.motor_temps
+                    .map((value) => Number(value))
+                    .filter((value) => Number.isFinite(value))
+                  : [];
+                if (temps.length > 0) {
+                  const fallbackPeakTemp = Math.max(...temps);
+                  sysPeakTemp.textContent = `${fallbackPeakTemp.toFixed(1)} °C (${peakJoint})`;
+                } else {
+                  sysPeakTemp.textContent = "-- °C (--)";
+                }
+              }
+            }
             if (sysConnection) {
               if (data.connected) {
                 sysConnection.textContent = "CONNECTED";
@@ -278,61 +251,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 sysConnection.parentElement.classList.add("accent-red");
               }
             }
-
-            if (data.connected) {
-              if (rtPower) {
-                rtPower.textContent = `${formatNumber(data.power_v, 1)} V | ${formatNumber(data.power_a, 1)} A | ${formatNumber(data.power_w, 1)} W`;
-              }
-              if (rtCycle) {
-                rtCycle.textContent = Number.isFinite(Number(data.battery_cycle)) ? `${Math.round(Number(data.battery_cycle))}` : "--";
-              }
-              if (rtCellRange) {
-                rtCellRange.textContent = `${formatNumber(data.cell_min_v, 3)} V / ${formatNumber(data.cell_max_v, 3)} V`;
-              }
-              if (rtRpy) {
-                rtRpy.textContent = formatTriplet(data.imu_rpy, 2);
-              }
-              if (rtGyro) {
-                rtGyro.textContent = formatTriplet(data.imu_gyro, 2);
-              }
-              if (rtAccel) {
-                rtAccel.textContent = formatTriplet(data.imu_accel, 2);
-              }
-              if (rtJointHealth) {
-                const idx = Number(data.joint_hottest_index);
-                const peak = Number(data.joint_hottest_temp_c);
-                const lost = Number(data.joint_lost_count);
-                rtJointHealth.textContent = `J${Number.isFinite(idx) ? Math.round(idx) : "--"} | ${Number.isFinite(peak) ? peak.toFixed(1) : "--"} C | lost ${Number.isFinite(lost) ? Math.round(lost) : "--"}`;
-              }
-              if (rtJointTau) {
-                rtJointTau.textContent = `${formatNumber(data.joint_avg_tau, 2)} Nm`;
-              }
-              if (rtAvgTemp) {
-                rtAvgTemp.textContent = `${formatNumber(data.avg_temp_c, 1)} C`;
-              }
-              if (rtPeakTemp) {
-                const idx = Number(data.joint_hottest_index);
-                const peak = Number(data.joint_hottest_temp_c);
-                rtPeakTemp.textContent = `J${Number.isFinite(idx) ? Math.round(idx) : "--"} | ${Number.isFinite(peak) ? peak.toFixed(1) : "--"} C`;
-              }
-              if (rtNtc) {
-                rtNtc.textContent = `${formatNumber(data.temp_ntc1_c, 0)} C / ${formatNumber(data.temp_ntc2_c, 0)} C`;
-              }
-              if (rtImuTemp) {
-                rtImuTemp.textContent = `${formatNumber(data.imu_temp_c, 0)} C`;
-              }
-              if (rtFootForce) {
-                rtFootForce.textContent = formatQuad(data.foot_force);
-              }
-              if (rtFootForceEst) {
-                rtFootForceEst.textContent = formatQuad(data.foot_force_est);
-              }
-              if (travelSpeedVal) {
-                const speed = Number(data.travel_speed_mps);
-                travelSpeedVal.textContent = Number.isFinite(speed) ? `${speed.toFixed(2)} m/s` : "-- m/s";
-              }
-            } else {
-              resetRobotTelemetryUi();
+            if (travelSpeedVal) {
+              const speed = Number(data.travel_speed_mps);
+              travelSpeedVal.textContent = Number.isFinite(speed)
+                ? `${speed.toFixed(2)} m/s`
+                : "-- m/s";
             }
 
             if (currentMode === "go2" && data.gesture_dispatch_enabled !== undefined) {
@@ -489,7 +412,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (sysTelemetry) {
       sysTelemetry.textContent = "-- °C";
     }
-    resetRobotTelemetryUi();
+    if (sysPeakTemp) {
+      sysPeakTemp.textContent = "-- °C (--)";
+    }
+    if (travelSpeedVal) {
+      travelSpeedVal.textContent = "-- m/s";
+    }
 
     // Reset pose values
     const poseVals = document.querySelectorAll(".pose-value");
