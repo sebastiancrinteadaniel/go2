@@ -54,6 +54,14 @@ async def offer(request: Request):
                     fps = getattr(camera_track, "current_fps", 0.0)
                     detections = getattr(camera_track, "latest_detections", [])
                     gestures = getattr(camera_track, "latest_gestures", [])
+                    motor_temps = telemetry.motor_temps
+                    avg_temp_c = (
+                        sum(motor_temps) / len(motor_temps)
+                        if motor_temps
+                        else None
+                    )
+                    max_temp_c = max(motor_temps) if motor_temps else None
+                    power_w = telemetry.power_v * telemetry.power_a
                     
                     data = json.dumps({
                         "type": "stats", 
@@ -66,7 +74,29 @@ async def offer(request: Request):
                         "gesture_dispatch_enabled": getattr(getattr(camera_track, "gesture_dispatcher", None), "enabled", False),
                         "battery": telemetry.battery_soc,
                         "connected": telemetry.connected and ((time.time() - telemetry.last_update) < 2.0),
-                        "motor_temps": telemetry.motor_temps
+                        "motor_temps": motor_temps,
+                        "avg_temp_c": avg_temp_c,
+                        "max_temp_c": max_temp_c,
+                        "power_v": telemetry.power_v,
+                        "power_a": telemetry.power_a,
+                        "power_w": power_w,
+                        "battery_cycle": telemetry.battery_cycle,
+                        "cell_min_v": telemetry.cell_min_v,
+                        "cell_max_v": telemetry.cell_max_v,
+                        "imu_rpy": telemetry.imu_rpy,
+                        "imu_gyro": telemetry.imu_gyro,
+                        "imu_accel": telemetry.imu_accel,
+                        "imu_temp_c": telemetry.imu_temp_c,
+                        "joint_hottest_index": telemetry.joint_hottest_index,
+                        "joint_hottest_temp_c": telemetry.joint_hottest_temp_c,
+                        "joint_lost_count": telemetry.joint_lost_count,
+                        "joint_avg_tau": telemetry.joint_avg_tau,
+                        "foot_force": telemetry.foot_force,
+                        "foot_force_est": telemetry.foot_force_est,
+                        "temp_ntc1_c": telemetry.temp_ntc1_c,
+                        "temp_ntc2_c": telemetry.temp_ntc2_c,
+                        "velocity_xyz": telemetry.velocity_xyz,
+                        "travel_speed_mps": telemetry.travel_speed_mps,
                     })
                     try:
                         channel.send(data)

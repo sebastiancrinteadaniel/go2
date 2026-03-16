@@ -13,7 +13,7 @@
     <header class="top-bar">
       <div class="brand">
         <div class="logo-container">
-          <img src="/static/icons/shield-logo.svg" class="logo" alt="Logo" onerror="this.style.display = 'none'" />
+          <img src="/static/icons/logo.svg" class="logo" alt="Logo" onerror="this.src='/static/icons/shield-logo.svg'" />
         </div>
         <div class="brand-text">
           <h1>QUADRUPED C2 | INDUSTRIAL INSPECTION</h1>
@@ -34,10 +34,10 @@
           </span>
         </div>
         <div class="telemetry-item">
-          <span class="label">TELEMETRY</span>
+          <span class="label">TEMPERATURE</span>
           <span class="val" id="sys-telemetry-wrapper" style="color: var(--accent-blue); gap: 0.4rem;">
             <img src="/static/icons/telemetry.svg" alt="Telemetry" style="width: 16px; height: 16px;"
-              onerror="this.style.display = 'none'" /> <span id="sys-telemetry">-- GHz</span>
+              onerror="this.style.display = 'none'" /> <span id="sys-telemetry">-- °C</span>
           </span>
         </div>
         <div class="telemetry-item">
@@ -225,7 +225,7 @@
                 </div>
                 <div class="btm-telem-text">
                   <span class="label">TRAVEL SPEED</span>
-                  <span class="val">0.45 m/s</span>
+                  <span class="val" id="travel-speed-val">-- m/s</span>
                 </div>
               </div>
 
@@ -340,21 +340,41 @@
                 d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
                 stroke="#8b95a5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
-            <h3>PRECISION MEASUREMENTS</h3>
+            <h3>ROBOT TELEMETRY</h3>
           </div>
 
           <ul class="data-list">
             <li>
-              <span class="data-label">P1-P2 (Gap):</span>
-              <span class="data-val highlight-blue">12.45 mm</span>
+              <span class="data-label">Bus V / A / W:</span>
+              <span class="data-val highlight-blue" id="rt-power">-- V | -- A | -- W</span>
             </li>
             <li>
-              <span class="data-label">Pipe Diameter:</span>
-              <span class="data-val highlight-blue">30.00 mm</span>
+              <span class="data-label">Battery Cycle:</span>
+              <span class="data-val highlight-blue" id="rt-cycle">--</span>
             </li>
             <li>
-              <span class="data-label">Bolt Height:</span>
-              <span class="data-val highlight-blue">15.22 mm</span>
+              <span class="data-label">Cell Min / Max:</span>
+              <span class="data-val highlight-blue" id="rt-cell-range">-- V / -- V</span>
+            </li>
+            <li>
+              <span class="data-label">RPY:</span>
+              <span class="data-val highlight-blue" id="rt-rpy">-- / -- / --</span>
+            </li>
+            <li>
+              <span class="data-label">Gyro XYZ:</span>
+              <span class="data-val highlight-blue" id="rt-gyro">-- / -- / --</span>
+            </li>
+            <li>
+              <span class="data-label">Accel XYZ:</span>
+              <span class="data-val highlight-blue" id="rt-accel">-- / -- / --</span>
+            </li>
+            <li>
+              <span class="data-label">Joint Health:</span>
+              <span class="data-val highlight-blue" id="rt-joint-health">J-- | -- C | lost --</span>
+            </li>
+            <li>
+              <span class="data-label">Avg |tau|:</span>
+              <span class="data-val highlight-blue" id="rt-joint-tau">-- Nm</span>
             </li>
           </ul>
         </div>
@@ -372,11 +392,27 @@
           <ul class="data-list">
             <li>
               <span class="data-label">Avg Temp:</span>
-              <span class="data-val highlight-green">24.2°C</span>
+              <span class="data-val highlight-green" id="rt-avg-temp">-- C</span>
             </li>
             <li>
-              <span class="data-label">Peak (Sensor 3):</span>
-              <span class="data-val highlight-red">42.8°C</span>
+              <span class="data-label">Peak Joint Temp:</span>
+              <span class="data-val highlight-red" id="rt-peak-temp">J-- | -- C</span>
+            </li>
+            <li>
+              <span class="data-label">NTC1 / NTC2:</span>
+              <span class="data-val highlight-green" id="rt-ntc">-- C / -- C</span>
+            </li>
+            <li>
+              <span class="data-label">IMU Temp:</span>
+              <span class="data-val highlight-green" id="rt-imu-temp">-- C</span>
+            </li>
+            <li>
+              <span class="data-label">Foot Force:</span>
+              <span class="data-val highlight-green" id="rt-foot-force">-- / -- / -- / --</span>
+            </li>
+            <li>
+              <span class="data-label">Foot Force Est:</span>
+              <span class="data-val highlight-green" id="rt-foot-force-est">-- / -- / -- / --</span>
             </li>
           </ul>
         </div>

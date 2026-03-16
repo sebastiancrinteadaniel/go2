@@ -52,18 +52,18 @@ body {
 }
 
 .logo-container {
-    width: 32px;
-    height: 32px;
-    background: #e11d48;
-    border-radius: 8px;
+    background: transparent;
+    border-radius: 6px;
     display: flex;
     justify-content: center;
     align-items: center;
+    overflow: hidden;
 }
 
 .logo {
-    width: 20px;
-    height: 20px;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 
 .brand-text h1 {
