@@ -57,6 +57,7 @@ class GestureDispatcher:
                 "like": self._action_like,
                 "dislike": self._action_dislike,
                 "peacesign": self._action_peace_sign,
+                "heart": self._action_heart,
             }
             logger.info(
                 "Gesture dispatcher initialized (cooldown=%.2fs, global_cooldown=%.2fs, min_confidence=%.2f, min_stable_frames=%d).",
@@ -142,7 +143,12 @@ class GestureDispatcher:
         if self._sport_client is None:
             return
         self._sport_client.StandUp()
-        self._sport_client.BalanceStand()
+        self._sport_client.FreeWalk()
+
+    def _action_heart(self) -> None:
+        if self._sport_client is None:
+            return
+        self._sport_client.Heart()
 
     def _action_dislike(self) -> None:
         if self._sport_client is None:

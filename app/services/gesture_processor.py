@@ -76,7 +76,7 @@ class GestureProcessor:
 
         self._hands = self._mp_hands.Hands(
             static_image_mode=False,
-            max_num_hands=10,
+            max_num_hands=2,
             model_complexity=0,
             min_detection_confidence=0.8,
             min_tracking_confidence=0.5,
