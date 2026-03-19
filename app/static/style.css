@@ -481,6 +481,13 @@ body {
     margin: 0;
 }
 
+.section-icon {
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
+    opacity: 0.9;
+}
+
 .component-list {
     display: flex;
     flex-direction: column;
@@ -512,6 +519,13 @@ body {
     color: #e2e8f0;
 }
 
+.status-icon {
+    width: 14px;
+    height: 14px;
+    object-fit: contain;
+    opacity: 0.95;
+}
+
 .dc-footer {
     display: flex;
     justify-content: space-between;
@@ -529,10 +543,6 @@ body {
     color: var(--accent-green);
 }
 
-.status-present .dc-header svg {
-    color: var(--accent-green);
-}
-
 .status-missing {
     background: rgba(239, 68, 68, 0.1);
     border: 1px solid rgba(239, 68, 68, 0.3);
@@ -542,20 +552,12 @@ body {
     color: var(--accent-red);
 }
 
-.status-missing .dc-header svg {
-    color: var(--accent-red);
-}
-
 .status-warning {
     background: rgba(245, 158, 11, 0.1);
     border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .status-warning .dc-state {
-    color: var(--accent-yellow);
-}
-
-.status-warning .dc-header svg {
     color: var(--accent-yellow);
 }
 
@@ -616,6 +618,7 @@ body {
     gap: 2rem;
     align-items: center;
     flex: 1;
+    min-width: 0;
 }
 
 .bottom-control-group {
@@ -713,10 +716,17 @@ body {
 
 .bottom-telemetry-group {
     display: flex;
-    gap: 2rem;
+    gap: 1rem;
     align-items: center;
-    margin-left: 2rem;
     flex: 1;
+    width: 100%;
+}
+
+.status-actions-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: auto;
 }
 
 .btm-telem-item {
@@ -753,7 +763,6 @@ body {
     gap: 0.6rem;
     padding-left: 1.5rem;
     border-left: 1px solid var(--border-color);
-    margin-left: auto;
 }
 
 .status-dot {
@@ -816,6 +825,14 @@ body {
 @media (max-width: 1200px) {
     .bottom-telemetry-group {
         display: none;
+    }
+
+    .bottom-bar-left {
+        flex: 0 1 auto;
+    }
+
+    .status-actions-group {
+        margin-left: auto;
     }
 }
 

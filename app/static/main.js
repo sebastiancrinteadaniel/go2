@@ -1,7 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
   // Elements
   const connectBtn = document.getElementById("connect-btn");
-  const recordBtn = document.querySelector(".record-btn");
   const statusDot = document.querySelector(".status-dot");
   const statusText = document.querySelector(".status-text");
   const videoExpandBtn = document.getElementById("video-expand-btn");
@@ -25,7 +24,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // State
   let isConnected = false;
-  let isRecording = false;
   let isYoloEnabled = false;
   let isGestureEnabled = false;
   let isGestureDispatchEnabled = true;
@@ -37,6 +35,25 @@ document.addEventListener("DOMContentLoaded", () => {
   let pingInterval;
   let lastPingTime = 0;
 
+  const expandIconSvg = `
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 3 21 3 21 9"></polyline>
+      <line x1="9" y1="21" x2="3" y2="21"></line>
+      <line x1="3" y1="21" x2="3" y2="15"></line>
+      <line x1="21" y1="3" x2="14" y2="10"></line>
+      <line x1="3" y1="21" x2="10" y2="14"></line>
+    </svg>
+  `;
+
+  const minimizeIconSvg = `
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="21" y1="3" x2="14" y2="10"></line>
+      <polyline points="17 10 14 10 14 7"></polyline>
+      <line x1="3" y1="21" x2="10" y2="14"></line>
+      <polyline points="7 14 10 14 10 17"></polyline>
+    </svg>
+  `;
+
   // Initialize modes
   const modeBadges = document.querySelectorAll(".mode-badge");
   modeBadges.forEach((badge) => {
@@ -47,6 +64,12 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   if (videoExpandBtn) {
+    const updateFullscreenIcon = () => {
+      videoExpandBtn.innerHTML = document.fullscreenElement ? minimizeIconSvg : expandIconSvg;
+    };
+
+    updateFullscreenIcon();
+
     videoExpandBtn.addEventListener("click", () => {
       const videoContainer = document.querySelector(".video-container");
       if (videoContainer) {
@@ -70,6 +93,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!document.fullscreenElement && videoContainer) {
         videoContainer.classList.remove("fullscreen");
       }
+
+      updateFullscreenIcon();
     });
   }
 
@@ -352,26 +377,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (pingInterval) {
         clearInterval(pingInterval);
       }
-
-      if (isRecording) {
-        toggleRecording();
-      }
     }
   });
-
-  // Record Button Handling
-  recordBtn.addEventListener("click", toggleRecording);
-
-  function toggleRecording() {
-    if (!isConnected) return; // Only record if stream is connected
-
-    isRecording = !isRecording;
-    if (isRecording) {
-      recordBtn.classList.add("recording");
-    } else {
-      recordBtn.classList.remove("recording");
-    }
-  }
 
   // Telemetry
   function startTelemetry() {
@@ -417,6 +424,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function getStatusIconPath(status) {
+    if (status === "missing") {
+      return "/static/icons/status-missing.svg";
+    }
+    if (status === "damaged") {
+      return "/static/icons/status-damaged.svg";
+    }
+    return "/static/icons/status-present.svg";
+  }
+
   function updateDetections(detections) {
     if (!componentList) return;
 
@@ -449,16 +466,19 @@ document.addEventListener("DOMContentLoaded", () => {
         foundCard.className = 'detection-card status-present';
         foundCard.querySelector('.dc-state').textContent = 'PRESENT';
         foundCard.querySelector('.dc-conf').textContent = `CONF: ${confPercent}%`;
+        const statusIcon = foundCard.querySelector('.status-icon');
+        if (statusIcon) {
+          statusIcon.src = getStatusIconPath('present');
+          statusIcon.alt = 'Present';
+        }
       } else {
         // Create a new dynamic card specifically for computer vision targets
         const cardHTML = `
             <div class="detection-card status-present" data-dynamic="true">
               <div class="dc-header">
                 <h4>${clsName}</h4>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                  <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
+                <img src="${getStatusIconPath('present')}" class="status-icon" alt="Present"
+                  onerror="this.style.display='none'" />
               </div>
               <div class="dc-footer">
                 <span class="dc-state">PRESENT</span>
@@ -478,6 +498,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!uniqueDets[title]) {
         card.className = 'detection-card status-missing';
         card.querySelector('.dc-state').textContent = 'MISSING';
+        const statusIcon = card.querySelector('.status-icon');
+        if (statusIcon) {
+          statusIcon.src = getStatusIconPath('missing');
+          statusIcon.alt = 'Missing';
+        }
       }
     });
   }

@@ -150,15 +150,12 @@
 
         <footer class="bottom-bar panel-solid mt-12">
           <div class="bottom-bar-left">
-            <!-- Left Controls: Play, Record, Secondary actions -->
+            <!-- Left Controls: Play + AI controls -->
             <div class="bottom-control-group">
               <button id="connect-btn" class="icon-btn play-btn" aria-label="Start Stream">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M5 3l14 9-14 9V3z" />
                 </svg>
-              </button>
-              <button class="icon-btn record-btn" aria-label="Record">
-                <div class="record-dot"></div>
               </button>
               <button id="yolo-btn" class="secondary-btn" aria-label="Toggle AI Detection" title="Toggle AI Detection"
                 style="display: none;">
@@ -189,48 +186,25 @@
                 </svg>
                 GESTURE ACTIONS
               </button>
-
-              <button class="secondary-btn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="23 4 23 10 17 10" />
-                  <polyline points="1 20 1 14 7 14" />
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                </svg>
-                RE-SCAN AREA
-              </button>
-              <button class="secondary-btn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                </svg>
-                CAPTURE LOG
-              </button>
             </div>
 
             <!-- Middle Telemetry Group -->
             <div class="bottom-telemetry-group">
-              <div class="btm-telem-item">
-                <div class="btm-icon-wrap blue-wrap">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)"
-                    stroke-width="2">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                    <circle cx="12" cy="10" r="3" />
+              <div class="status-actions-group">
+                <button class="secondary-btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10" />
+                    <polyline points="1 20 1 14 7 14" />
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
                   </svg>
-                </div>
-                <div class="btm-telem-text">
-                  <span class="label">LOCATION</span>
-                  <span class="val">SECTOR 7-B | PIPE_ARRAY</span>
-                </div>
-              </div>
-
-              <div class="btm-telem-item">
-                <div class="btm-icon-wrap orange-wrap">
-                  <img src="/static/icons/travel-speed.svg" alt="Travel Speed" style="width: 16px; height: 16px;"
-                    onerror="this.style.display = 'none'" />
-                </div>
-                <div class="btm-telem-text">
-                  <span class="label">TRAVEL SPEED</span>
-                  <span class="val">0.45 m/s</span>
-                </div>
+                  RE-SCAN AREA
+                </button>
+                <button class="secondary-btn">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                  CAPTURE LOG
+                </button>
               </div>
 
               <div class="stream-status" id="dc-status">
@@ -264,10 +238,8 @@
             <div class="detection-card status-present">
               <div class="dc-header">
                 <h4>Main Pipe Joint</h4>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                  <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
+                <img src="/static/icons/status-present.svg" class="status-icon" alt="Present"
+                  onerror="this.style.display='none'" />
               </div>
               <div class="dc-footer">
                 <span class="dc-state">PRESENT</span>
@@ -278,11 +250,8 @@
             <div class="detection-card status-missing">
               <div class="dc-header">
                 <h4>M8 Screw (Inner)</h4>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
+                <img src="/static/icons/status-missing.svg" class="status-icon" alt="Missing"
+                  onerror="this.style.display='none'" />
               </div>
               <div class="dc-footer">
                 <span class="dc-state">MISSING</span>
@@ -293,10 +262,8 @@
             <div class="detection-card status-present">
               <div class="dc-header">
                 <h4>Support Bracket</h4>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                  <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
+                <img src="/static/icons/status-present.svg" class="status-icon" alt="Present"
+                  onerror="this.style.display='none'" />
               </div>
               <div class="dc-footer">
                 <span class="dc-state">PRESENT</span>
@@ -307,11 +274,8 @@
             <div class="detection-card status-warning">
               <div class="dc-header">
                 <h4>Pressure Valve</h4>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
+                <img src="/static/icons/status-damaged.svg" class="status-icon" alt="Damaged"
+                  onerror="this.style.display='none'" />
               </div>
               <div class="dc-footer">
                 <span class="dc-state">DAMAGED</span>
@@ -322,11 +286,8 @@
             <div class="detection-card status-missing">
               <div class="dc-header">
                 <h4>Hex Bolt B1</h4>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
+                <img src="/static/icons/status-missing.svg" class="status-icon" alt="Missing"
+                  onerror="this.style.display='none'" />
               </div>
               <div class="dc-footer">
                 <span class="dc-state">MISSING</span>
@@ -339,11 +300,8 @@
         <!-- Section 2 -->
         <div class="sidebar-section panel-solid">
           <div class="section-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
-                stroke="#8b95a5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
+            <img src="/static/icons/precision-measurements.svg" class="section-icon" alt="Precision"
+              onerror="this.style.display='none'" />
             <h3>PRECISION MEASUREMENTS</h3>
           </div>
 
