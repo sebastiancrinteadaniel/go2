@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const gestureBtn = document.getElementById("gesture-btn");
   const gestureDispatchBtn = document.getElementById("gesture-dispatch-btn");
 
+  const camName = document.getElementById("cam-name");
   const camFps = document.getElementById("cam-fps");
   const camLatency = document.getElementById("cam-latency");
 
@@ -54,14 +55,66 @@ document.addEventListener("DOMContentLoaded", () => {
     </svg>
   `;
 
+  function getModeFromBadge(badge) {
+    const span = badge.querySelector("span");
+    const label = span ? span.textContent.trim() : "";
+
+    if (label === "GO2 CAMERA") {
+      return "go2";
+    }
+    if (label === "THERMAL") {
+      return "thermal";
+    }
+    if (label === "SENSOR FUSION") {
+      return "sensor_fusion";
+    }
+    return "hd_view";
+  }
+
+  function getCamNameForMode(mode) {
+    if (mode === "thermal") {
+      return "THERMAL_CAMERA";
+    }
+    if (mode === "sensor_fusion") {
+      return "SENSOR_FUSION_CAM";
+    }
+    if (mode === "go2") {
+      return "GO2_CAMERA";
+    }
+    return "GENERIC_USB_CAM";
+  }
+
+  function updateModeUI(mode) {
+    currentMode = mode;
+    if (camName) {
+      camName.textContent = getCamNameForMode(mode);
+    }
+
+    if (gestureDispatchBtn && isConnected) {
+      gestureDispatchBtn.style.display = mode === "go2" ? "flex" : "none";
+    }
+  }
+
+  function getSelectedMode() {
+    let selectedMode = "hd_view";
+    modeBadges.forEach((badge) => {
+      if (badge.classList.contains("active")) {
+        selectedMode = getModeFromBadge(badge);
+      }
+    });
+    return selectedMode;
+  }
+
   // Initialize modes
   const modeBadges = document.querySelectorAll(".mode-badge");
   modeBadges.forEach((badge) => {
     badge.addEventListener("click", () => {
       modeBadges.forEach((b) => b.classList.remove("active"));
       badge.classList.add("active");
+      updateModeUI(getModeFromBadge(badge));
     });
   });
+  updateModeUI(getSelectedMode());
 
   if (videoExpandBtn) {
     const updateFullscreenIcon = () => {
@@ -294,20 +347,8 @@ document.addEventListener("DOMContentLoaded", () => {
       // Explicitly request to receive video so the backend knows what to negotiate
       pc.addTransceiver("video", { direction: "recvonly" });
 
-      let selectedMode = "hd_view";
-      modeBadges.forEach((badge) => {
-        if (badge.classList.contains("active")) {
-          const span = badge.querySelector("span");
-          if (span && span.textContent === "GO2 CAMERA") {
-            selectedMode = "go2";
-          } else if (span && span.textContent === "THERMAL") {
-            selectedMode = "thermal";
-          } else if (span && span.textContent === "SENSOR FUSION") {
-            selectedMode = "sensor_fusion";
-          }
-        }
-      });
-      currentMode = selectedMode;
+      const selectedMode = getSelectedMode();
+      updateModeUI(selectedMode);
 
       pc.createOffer()
         .then((offer) => pc.setLocalDescription(offer))

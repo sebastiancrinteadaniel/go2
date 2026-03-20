@@ -157,35 +157,37 @@
                   <path d="M5 3l14 9-14 9V3z" />
                 </svg>
               </button>
-              <button id="yolo-btn" class="secondary-btn" aria-label="Toggle AI Detection" title="Toggle AI Detection"
-                style="display: none;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                </svg>
-                AI DETECT
-              </button>
+              <div class="vision-control-group">
+                <button id="yolo-btn" class="secondary-btn" aria-label="Toggle AI Detection" title="Toggle AI Detection"
+                  style="display: none;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                  </svg>
+                  AI DETECT
+                </button>
 
-              <button id="gesture-btn" class="secondary-btn" aria-label="Toggle Hand Gesture" title="Toggle Hand Gesture"
-                style="display: none;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M7 11V5a1 1 0 0 1 2 0v6" />
-                  <path d="M11 10V4a1 1 0 0 1 2 0v6" />
-                  <path d="M15 11V6a1 1 0 0 1 2 0v7" />
-                  <path d="M19 13v2a7 7 0 0 1-14 0v-4a1 1 0 0 1 2 0v3" />
-                </svg>
-                HAND GESTURE
-              </button>
+                <button id="gesture-btn" class="secondary-btn" aria-label="Toggle Hand Gesture" title="Toggle Hand Gesture"
+                  style="display: none;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M7 11V5a1 1 0 0 1 2 0v6" />
+                    <path d="M11 10V4a1 1 0 0 1 2 0v6" />
+                    <path d="M15 11V6a1 1 0 0 1 2 0v7" />
+                    <path d="M19 13v2a7 7 0 0 1-14 0v-4a1 1 0 0 1 2 0v3" />
+                  </svg>
+                  HAND GESTURE
+                </button>
 
-              <button id="gesture-dispatch-btn" class="secondary-btn" aria-label="Toggle Gesture Dispatch"
-                title="Toggle Gesture Dispatch" style="display: none;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                  stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                </svg>
-                GESTURE ACTIONS
-              </button>
+                <button id="gesture-dispatch-btn" class="secondary-btn" aria-label="Toggle Gesture Dispatch"
+                  title="Toggle Gesture Dispatch" style="display: none;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                  </svg>
+                  GESTURE ACTIONS
+                </button>
+              </div>
             </div>
 
             <!-- Middle Telemetry Group -->
@@ -218,129 +220,131 @@
 
       <!-- Right Column: Sidebar -->
       <aside class="sidebar">
-        <!-- Section 1 -->
-        <div class="sidebar-section panel-solid">
-          <div class="section-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
-                stroke="#8b95a5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="#8b95a5" stroke-width="2" stroke-linecap="round"
-                stroke-linejoin="round" />
-              <line x1="12" y1="22.08" x2="12" y2="12" stroke="#8b95a5" stroke-width="2" stroke-linecap="round"
-                stroke-linejoin="round" />
-            </svg>
-            <h3>INDUSTRIAL COMPONENT DETECTION</h3>
+        <div class="sidebar-scroll">
+          <!-- Section 1 -->
+          <div class="sidebar-section panel-solid">
+            <div class="section-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                  stroke="#8b95a5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="#8b95a5" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round" />
+                <line x1="12" y1="22.08" x2="12" y2="12" stroke="#8b95a5" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round" />
+              </svg>
+              <h3>INDUSTRIAL COMPONENT DETECTION</h3>
+            </div>
+
+            <div class="component-list" id="component-list">
+              <!-- Card 1 -->
+              <div class="detection-card status-present">
+                <div class="dc-header">
+                  <h4>Main Pipe Joint</h4>
+                  <img src="/static/icons/status-present.svg" class="status-icon" alt="Present"
+                    onerror="this.style.display='none'" />
+                </div>
+                <div class="dc-footer">
+                  <span class="dc-state">PRESENT</span>
+                  <span class="dc-conf">CONF: 98%</span>
+                </div>
+              </div>
+              <!-- Card 2 -->
+              <div class="detection-card status-missing">
+                <div class="dc-header">
+                  <h4>M8 Screw (Inner)</h4>
+                  <img src="/static/icons/status-missing.svg" class="status-icon" alt="Missing"
+                    onerror="this.style.display='none'" />
+                </div>
+                <div class="dc-footer">
+                  <span class="dc-state">MISSING</span>
+                  <span class="dc-conf">CONF: 94%</span>
+                </div>
+              </div>
+              <!-- Card 3 -->
+              <div class="detection-card status-present">
+                <div class="dc-header">
+                  <h4>Support Bracket</h4>
+                  <img src="/static/icons/status-present.svg" class="status-icon" alt="Present"
+                    onerror="this.style.display='none'" />
+                </div>
+                <div class="dc-footer">
+                  <span class="dc-state">PRESENT</span>
+                  <span class="dc-conf">CONF: 99%</span>
+                </div>
+              </div>
+              <!-- Card 4 -->
+              <div class="detection-card status-warning">
+                <div class="dc-header">
+                  <h4>Pressure Valve</h4>
+                  <img src="/static/icons/status-damaged.svg" class="status-icon" alt="Damaged"
+                    onerror="this.style.display='none'" />
+                </div>
+                <div class="dc-footer">
+                  <span class="dc-state">DAMAGED</span>
+                  <span class="dc-conf">CONF: 87%</span>
+                </div>
+              </div>
+              <!-- Card 5 -->
+              <div class="detection-card status-missing">
+                <div class="dc-header">
+                  <h4>Hex Bolt B1</h4>
+                  <img src="/static/icons/status-missing.svg" class="status-icon" alt="Missing"
+                    onerror="this.style.display='none'" />
+                </div>
+                <div class="dc-footer">
+                  <span class="dc-state">MISSING</span>
+                  <span class="dc-conf">CONF: 92%</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="component-list" id="component-list">
-            <!-- Card 1 -->
-            <div class="detection-card status-present">
-              <div class="dc-header">
-                <h4>Main Pipe Joint</h4>
-                <img src="/static/icons/status-present.svg" class="status-icon" alt="Present"
-                  onerror="this.style.display='none'" />
-              </div>
-              <div class="dc-footer">
-                <span class="dc-state">PRESENT</span>
-                <span class="dc-conf">CONF: 98%</span>
-              </div>
+          <!-- Section 2 -->
+          <div class="sidebar-section panel-solid">
+            <div class="section-title">
+              <img src="/static/icons/precision-measurements.svg" class="section-icon" alt="Precision"
+                onerror="this.style.display='none'" />
+              <h3>PRECISION MEASUREMENTS</h3>
             </div>
-            <!-- Card 2 -->
-            <div class="detection-card status-missing">
-              <div class="dc-header">
-                <h4>M8 Screw (Inner)</h4>
-                <img src="/static/icons/status-missing.svg" class="status-icon" alt="Missing"
-                  onerror="this.style.display='none'" />
-              </div>
-              <div class="dc-footer">
-                <span class="dc-state">MISSING</span>
-                <span class="dc-conf">CONF: 94%</span>
-              </div>
-            </div>
-            <!-- Card 3 -->
-            <div class="detection-card status-present">
-              <div class="dc-header">
-                <h4>Support Bracket</h4>
-                <img src="/static/icons/status-present.svg" class="status-icon" alt="Present"
-                  onerror="this.style.display='none'" />
-              </div>
-              <div class="dc-footer">
-                <span class="dc-state">PRESENT</span>
-                <span class="dc-conf">CONF: 99%</span>
-              </div>
-            </div>
-            <!-- Card 4 -->
-            <div class="detection-card status-warning">
-              <div class="dc-header">
-                <h4>Pressure Valve</h4>
-                <img src="/static/icons/status-damaged.svg" class="status-icon" alt="Damaged"
-                  onerror="this.style.display='none'" />
-              </div>
-              <div class="dc-footer">
-                <span class="dc-state">DAMAGED</span>
-                <span class="dc-conf">CONF: 87%</span>
-              </div>
-            </div>
-            <!-- Card 5 -->
-            <div class="detection-card status-missing">
-              <div class="dc-header">
-                <h4>Hex Bolt B1</h4>
-                <img src="/static/icons/status-missing.svg" class="status-icon" alt="Missing"
-                  onerror="this.style.display='none'" />
-              </div>
-              <div class="dc-footer">
-                <span class="dc-state">MISSING</span>
-                <span class="dc-conf">CONF: 92%</span>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Section 2 -->
-        <div class="sidebar-section panel-solid">
-          <div class="section-title">
-            <img src="/static/icons/precision-measurements.svg" class="section-icon" alt="Precision"
-              onerror="this.style.display='none'" />
-            <h3>PRECISION MEASUREMENTS</h3>
+            <ul class="data-list">
+              <li>
+                <span class="data-label">P1-P2 (Gap):</span>
+                <span class="data-val highlight-blue">12.45 mm</span>
+              </li>
+              <li>
+                <span class="data-label">Pipe Diameter:</span>
+                <span class="data-val highlight-blue">30.00 mm</span>
+              </li>
+              <li>
+                <span class="data-label">Bolt Height:</span>
+                <span class="data-val highlight-blue">15.22 mm</span>
+              </li>
+            </ul>
           </div>
 
-          <ul class="data-list">
-            <li>
-              <span class="data-label">P1-P2 (Gap):</span>
-              <span class="data-val highlight-blue">12.45 mm</span>
-            </li>
-            <li>
-              <span class="data-label">Pipe Diameter:</span>
-              <span class="data-val highlight-blue">30.00 mm</span>
-            </li>
-            <li>
-              <span class="data-label">Bolt Height:</span>
-              <span class="data-val highlight-blue">15.22 mm</span>
-            </li>
-          </ul>
-        </div>
+          <!-- Section 3 -->
+          <div class="sidebar-section panel-solid">
+            <div class="section-title">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke="#8b95a5" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <h3>THERMAL ANALYSIS</h3>
+            </div>
 
-        <!-- Section 3 -->
-        <div class="sidebar-section panel-solid">
-          <div class="section-title">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" stroke="#8b95a5" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-            <h3>THERMAL ANALYSIS</h3>
+            <ul class="data-list">
+              <li>
+                <span class="data-label">Avg Temp:</span>
+                <span class="data-val highlight-green">24.2°C</span>
+              </li>
+              <li>
+                <span class="data-label">Peak (Sensor 3):</span>
+                <span class="data-val highlight-red">42.8°C</span>
+              </li>
+            </ul>
           </div>
-
-          <ul class="data-list">
-            <li>
-              <span class="data-label">Avg Temp:</span>
-              <span class="data-val highlight-green">24.2°C</span>
-            </li>
-            <li>
-              <span class="data-label">Peak (Sensor 3):</span>
-              <span class="data-val highlight-red">42.8°C</span>
-            </li>
-          </ul>
         </div>
 
         <div class="sidebar-footer" style="margin-top: auto; padding-bottom: 1rem">
