@@ -50,10 +50,17 @@ class GestureProcessor:
         self._setup_mediapipe()
         self._load_model_assets()
 
+    _HEART_CONF_THRESHOLD = 0.6
+
     @staticmethod
-    def _normalize_landmarks(landmarks) -> List[float]:
+    def _normalize_landmarks(landmarks, is_left: bool = False) -> List[float]:
         base_x, base_y = landmarks[0].x, landmarks[0].y
-        coords = [[lm.x - base_x, lm.y - base_y] for lm in landmarks]
+        coords = []
+        for lm in landmarks:
+            x = lm.x - base_x
+            if is_left:
+                x = -x  # mirror left hand so it looks like right hand to the model
+            coords.append([x, lm.y - base_y])
         flat = list(itertools.chain.from_iterable(coords))
         max_value = max(map(abs, flat)) if flat else 0.0
         if max_value <= 0:
@@ -125,11 +132,11 @@ class GestureProcessor:
         except Exception as e:
             logger.warning(f"Gesture warmup failed: {e}")
 
-    def _classify(self, landmarks) -> Tuple[str, float]:
+    def _classify(self, landmarks, is_left: bool = False) -> Tuple[str, float]:
         if self._ort_session is None or not self._labels:
             return "hand", 0.5
         try:
-            input_data = np.array([self._normalize_landmarks(landmarks)], dtype=np.float32)
+            input_data = np.array([self._normalize_landmarks(landmarks, is_left)], dtype=np.float32)
             probs = softmax(self._ort_session.run(None, {self._input_name: input_data})[0][0])
             gesture_id = int(np.argmax(probs))
             label = self._labels[gesture_id] if gesture_id < len(self._labels) else "unknown"
@@ -152,6 +159,11 @@ class GestureProcessor:
         gestures = []
         h, w, _ = frame.shape
 
+        hand_labels: List[str] = []
+        hand_confs: List[float] = []
+        hand_centers: List[Tuple[int, int]] = []
+        hand_top_ys: List[int] = []
+
         for i, hand_landmarks in enumerate(results.multi_hand_landmarks):
             self._mp_draw.draw_landmarks(
                 frame_out,
@@ -170,15 +182,24 @@ class GestureProcessor:
 
             cv2.rectangle(frame_out, (x1, y1), (x2, y2), self._BOX_COLOR, 2)
 
-            label, conf = self._classify(hand_landmarks.landmark)
-
+            is_left = False
             handedness_str = ""
             if results.multi_handedness and i < len(results.multi_handedness):
                 try:
                     raw = results.multi_handedness[i].classification[0].label
-                    handedness_str = "Left" if raw == "Right" else "Right"
+                    is_left = (raw == "Left")
+                    handedness_str = "Right" if raw == "Left" else "Left"
                 except Exception:
                     pass
+
+            label, conf = self._classify(hand_landmarks.landmark, is_left)
+
+            cx = (x1 + x2) // 2
+            cy = (y1 + y2) // 2
+            hand_labels.append(label)
+            hand_confs.append(conf)
+            hand_centers.append((cx, cy))
+            hand_top_ys.append(y1 - 60)
 
             cv2.putText(
                 frame_out, f"{label} ({conf * 100:.1f}%)",
@@ -194,6 +215,25 @@ class GestureProcessor:
                 )
 
             gestures.append({"class": f"gesture:{label}", "conf": conf, "bbox": (x1, y1, x2, y2)})
+
+        if (
+            len(hand_labels) == 2
+            and "HeartHalf" in self._labels
+            and all(lbl == "HeartHalf" for lbl in hand_labels)
+            and all(c >= self._HEART_CONF_THRESHOLD for c in hand_confs)
+        ):
+            anchor_x = (hand_centers[0][0] + hand_centers[1][0]) // 2
+            anchor_y = min(hand_top_ys) - 20
+            text = "Heart <3"
+            font, scale, thickness = cv2.FONT_HERSHEY_SIMPLEX, 1.5, 3
+            (tw, _th), _ = cv2.getTextSize(text, font, scale, thickness)
+            cv2.putText(
+                frame_out, text,
+                (anchor_x - tw // 2, max(30, anchor_y)),
+                font, scale, (0, 0, 255), thickness, cv2.LINE_AA,
+            )
+            heart_conf = min(hand_confs)
+            gestures.append({"class": "gesture:heart", "conf": heart_conf, "bbox": None})
 
         return frame_out, gestures
 

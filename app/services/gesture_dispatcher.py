@@ -58,6 +58,7 @@ class GestureDispatcher:
                 "dislike": self._action_dislike,
                 "peacesign": self._action_peace_sign,
                 "heart": self._action_heart,
+                "fingerheart": self._action_heart,
             }
             logger.info(
                 "Gesture dispatcher initialized (cooldown=%.2fs, global_cooldown=%.2fs, min_confidence=%.2f, min_stable_frames=%d).",
