@@ -22,6 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const sysTelemetry = document.getElementById("sys-telemetry");
   const sysPeakTemp = document.getElementById("sys-peak-temp");
   const componentList = document.getElementById("component-list");
+  const imuUnitToggle = document.getElementById("imu-unit-toggle");
 
   // State
   let isConnected = false;
@@ -30,6 +31,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let isGestureDispatchEnabled = true;
   let telemetryInterval;
   let currentMode = "hd_view";
+  let imuInDegrees = true;
+  let lastImuRpy = null;
 
   let pc = null;
   let dc = null;
@@ -332,6 +335,10 @@ document.addEventListener("DOMContentLoaded", () => {
               isGestureDispatchEnabled = !!data.gesture_dispatch_enabled;
               setToggleButtonState(gestureDispatchBtn, isGestureDispatchEnabled);
             }
+            if (Array.isArray(data.imu_rpy) && data.imu_rpy.length === 3) {
+              lastImuRpy = data.imu_rpy;
+              renderImuPose();
+            }
           }
         } catch (e) {
           // Ignore non-json
@@ -421,6 +428,33 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // IMU unit toggle
+  function renderImuPose() {
+    if (!lastImuRpy) return;
+    const poseVals = document.querySelectorAll(".pose-value");
+    if (poseVals.length < 3) return;
+    const [rawRoll, rawPitch, rawYaw] = lastImuRpy;
+    if (imuInDegrees) {
+      const R2D = 180 / Math.PI;
+      const pitch = rawPitch * R2D;
+      const roll  = rawRoll  * R2D;
+      const yaw   = rawYaw   * R2D;
+      poseVals[0].textContent = (pitch >= 0 ? "+" : "") + pitch.toFixed(1) + "°";
+      poseVals[1].textContent = (roll  >= 0 ? "+" : "") + roll.toFixed(1)  + "°";
+      poseVals[2].textContent = yaw.toFixed(1) + "°";
+    } else {
+      poseVals[0].textContent = (rawPitch >= 0 ? "+" : "") + rawPitch.toFixed(3) + " rad";
+      poseVals[1].textContent = (rawRoll  >= 0 ? "+" : "") + rawRoll.toFixed(3)  + " rad";
+      poseVals[2].textContent = rawYaw.toFixed(3) + " rad";
+    }
+  }
+
+  imuUnitToggle.addEventListener("click", () => {
+    imuInDegrees = !imuInDegrees;
+    imuUnitToggle.textContent = imuInDegrees ? "DEG" : "RAD";
+    renderImuPose();
+  });
+
   // Telemetry
   function startTelemetry() {
     pingInterval = setInterval(() => {
@@ -430,19 +464,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }, 1000);
 
-    telemetryInterval = setInterval(() => {
-      // Simulate pose fluctuations (these are still simulated for now)
-      const pitch = (2.4 + (Math.random() - 0.5) * 0.2).toFixed(1);
-      const roll = (-0.1 + (Math.random() - 0.5) * 0.1).toFixed(1);
-      const yaw = (184.2 + (Math.random() - 0.5) * 0.5).toFixed(1);
-
-      const poseVals = document.querySelectorAll(".pose-value");
-      if (poseVals.length >= 3) {
-        poseVals[0].textContent = (pitch >= 0 ? "+" : "") + pitch + "°";
-        poseVals[1].textContent = (roll >= 0 ? "+" : "") + roll + "°";
-        poseVals[2].textContent = yaw + "°";
-      }
-    }, 1000);
   }
 
   function stopTelemetry() {
@@ -459,9 +480,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // Reset pose values
     const poseVals = document.querySelectorAll(".pose-value");
     if (poseVals.length >= 3) {
-      poseVals[0].textContent = "+2.4°";
-      poseVals[1].textContent = "-0.1°";
-      poseVals[2].textContent = "184.2°";
+      poseVals[0].textContent = "--";
+      poseVals[1].textContent = "--";
+      poseVals[2].textContent = "--";
     }
   }
 

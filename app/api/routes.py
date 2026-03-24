@@ -16,6 +16,20 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+_active_pc: RTCPeerConnection | None = None
+_active_track: CameraStreamTrack | Go2CameraStreamTrack | None = None
+
+
+async def close_active_session() -> None:
+    """Tear down the current WebRTC session and release the camera."""
+    global _active_pc, _active_track
+    if _active_track is not None:
+        _active_track.stop()
+        _active_track = None
+    if _active_pc is not None:
+        await _active_pc.close()
+        _active_pc = None
+
 JOINT_NAMES = [
     "FR_0", "FR_1", "FR_2",
     "FL_0", "FL_1", "FL_2",
@@ -41,9 +55,19 @@ async def offer(request: Request):
     """
     Handle WebRTC offer from the frontend to establish a video stream connection.
     """
+    global _active_pc, _active_track
+
+    await close_active_session()
+
     params = await request.json()
     offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
     pc = RTCPeerConnection()
+
+    @pc.on("connectionstatechange")
+    async def on_connectionstatechange():
+        logger.info("WebRTC connection state: %s", pc.connectionState)
+        if pc.connectionState in ("failed", "closed"):
+            await close_active_session()
 
     # Initialize telemetry when WebRTC connection is established
     telemetry.init()
@@ -78,11 +102,11 @@ async def offer(request: Request):
                         )
                     
                     data = json.dumps({
-                        "type": "stats", 
-                        "cpu_percent": cpu_percent, 
-                        "ram_percent": ram.percent, 
-                        "uptime": uptime_seconds, 
-                        "detections": detections, 
+                        "type": "stats",
+                        "cpu_percent": cpu_percent,
+                        "ram_percent": ram.percent,
+                        "uptime": uptime_seconds,
+                        "detections": detections,
                         "gestures": gestures,
                         "fps": fps,
                         "gesture_dispatch_enabled": getattr(getattr(camera_track, "gesture_dispatcher", None), "enabled", False),
@@ -92,6 +116,7 @@ async def offer(request: Request):
                         "avg_temp_c": avg_temp_c,
                         "peak_temp_c": peak_temp_c,
                         "peak_joint_name": peak_joint_name,
+                        "imu_rpy": telemetry.imu_rpy,
                     })
                     try:
                         channel.send(data)
@@ -128,6 +153,9 @@ async def offer(request: Request):
         camera_track = Go2CameraStreamTrack()
     else:
         camera_track = CameraStreamTrack()
+
+    _active_pc = pc
+    _active_track = camera_track
 
     pc.addTrack(camera_track)
 

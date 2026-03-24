@@ -8,6 +8,7 @@ class RobotTelemetry:
     def __init__(self):
         self.battery_soc = 0
         self.motor_temps = []
+        self.imu_rpy = None  # [roll, pitch, yaw] in radians, or None if unavailable
         self.connected = False
         self.last_update = 0
         self.subscriber = None
@@ -37,6 +38,7 @@ class RobotTelemetry:
     def on_low_state(self, msg):
         self.battery_soc = msg.bms_state.soc
         self.motor_temps = [m.temperature for m in msg.motor_state[:12]]
+        self.imu_rpy = list(msg.imu_state.rpy)  # [roll, pitch, yaw] in radians
 
         self.connected = True
         self.last_update = time.time()

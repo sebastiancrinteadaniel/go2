@@ -123,6 +123,7 @@ class CameraStreamTrack(VideoStreamTrack):
     def stop(self):
         self._stop_event.set()
         self.gesture_processor.stop()
+        self.cap.release()
         super().stop()
 
 
@@ -172,10 +173,23 @@ class Go2CameraStreamTrack(VideoStreamTrack):
             cv2.LINE_AA,
         )
 
+        self._connecting_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.putText(
+            self._connecting_frame,
+            "GO2 CAMERA CONNECTING...",
+            (50, 240),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (200, 200, 200),
+            2,
+            cv2.LINE_AA,
+        )
+
+        self._initializing = True
         self._stop_event = threading.Event()
         self._frame_queue: queue.Queue = queue.Queue(maxsize=3)
         self._result_queue: queue.Queue = queue.Queue(maxsize=3)
-        self._last_frame: np.ndarray = self._offline_frame.copy()
+        self._last_frame: np.ndarray = self._connecting_frame.copy() if self.connected else self._offline_frame.copy()
         self._last_detections: list = []
         self._last_gestures: list = []
 
@@ -188,7 +202,7 @@ class Go2CameraStreamTrack(VideoStreamTrack):
 
     def _capture_loop(self) -> None:
         while not self._stop_event.is_set():
-            if not self.connected:
+            if not self.connected or self.client is None:
                 self._stop_event.wait(0.05)
                 continue
             try:
@@ -222,6 +236,7 @@ class Go2CameraStreamTrack(VideoStreamTrack):
 
             self.gesture_dispatcher.process(gestures)
 
+            self._initializing = False
             _safe_put(self._result_queue, (annotated, detections, gestures))
 
     async def recv(self):
@@ -232,7 +247,10 @@ class Go2CameraStreamTrack(VideoStreamTrack):
             self._last_detections = detections
             self._last_gestures = gestures
         except queue.Empty:
-            frame = self._last_frame
+            if self._initializing:
+                frame = self._connecting_frame if self.connected else self._offline_frame
+            else:
+                frame = self._last_frame
             detections = self._last_detections
             gestures = self._last_gestures
 
@@ -248,4 +266,5 @@ class Go2CameraStreamTrack(VideoStreamTrack):
     def stop(self):
         self._stop_event.set()
         self.gesture_processor.stop()
+        self.client = None  # stop capture loop from calling GetImageSample()
         super().stop()

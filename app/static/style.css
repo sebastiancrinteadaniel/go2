@@ -433,6 +433,25 @@ body {
     border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
+.imu-unit-btn {
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    letter-spacing: 0.08em;
+    background: rgba(99, 179, 237, 0.1);
+    color: var(--accent-blue);
+    border: 1px solid rgba(99, 179, 237, 0.25);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    font-family: inherit;
+}
+
+.imu-unit-btn:hover {
+    background: rgba(99, 179, 237, 0.2);
+    border-color: rgba(99, 179, 237, 0.45);
+}
+
 .pose-grid {
     display: flex;
     gap: 1rem;
