@@ -159,5 +159,5 @@ ssh unitree@192.168.123.18
 
 ### Via WiFi
 ```bash
-ssh unitree@<robot-wifi-ip>
+ssh unitree@192.168.56.174<robot-wifi-ip>
 ```
