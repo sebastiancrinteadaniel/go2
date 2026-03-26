@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import math
 import threading
@@ -7,6 +8,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+# Python 3.8 compatibility: md5() doesn't accept `usedforsecurity` kwarg,
+# but newer ReportLab calls it with that argument. Patch it out.
+_orig_md5 = hashlib.md5
+hashlib.md5 = lambda *a, **kw: _orig_md5(*a)  # type: ignore[assignment]
 
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, HRFlowable
 from svglib.svglib import svg2rlg
