@@ -449,6 +449,51 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // Generate QC Report
+  const reportBtn = document.getElementById("btn-report");
+  if (reportBtn) {
+    reportBtn.addEventListener("click", async () => {
+      const operator = prompt("Operator name:", "A. BOCA") ?? "Unknown";
+      const location = prompt("Location / Zone:", "—") ?? "—";
+
+      reportBtn.disabled = true;
+      reportBtn.textContent = "GENERATING...";
+
+      try {
+        const res = await fetch("/report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ operator, location }),
+        });
+
+        if (!res.ok) {
+          alert("Report generation failed.");
+          return;
+        }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const disposition = res.headers.get("Content-Disposition") ?? "";
+        const filename = disposition.includes('"')
+          ? disposition.split('"')[1]
+          : "QC-report.pdf";
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        alert("Report generation failed: " + err.message);
+      } finally {
+        reportBtn.disabled = false;
+        reportBtn.textContent = "GENERATE QC REPORT";
+      }
+    });
+  }
+
   imuUnitToggle.addEventListener("click", () => {
     imuInDegrees = !imuInDegrees;
     imuUnitToggle.textContent = imuInDegrees ? "DEG" : "RAD";

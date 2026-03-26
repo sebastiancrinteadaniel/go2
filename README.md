@@ -72,18 +72,10 @@ Browser
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.10+ (for edge device 3.8)
 - [uv](https://github.com/astral-sh/uv) package manager
 - `unitree_sdk2py` — optional, required for Go2 camera and robot control (graceful fallback to webcam mode without it)
 - CUDA / ONNX Runtime GPU — optional, falls back to CPU inference automatically
-
-### Installation
-
-```bash
-git clone <repo-url>
-cd c2_go2
-uv sync
-```
 
 ### Run
 
@@ -159,5 +151,5 @@ ssh unitree@192.168.123.18
 
 ### Via WiFi
 ```bash
-ssh unitree@192.168.56.174<robot-wifi-ip>
+ssh unitree@192.168.56.174 <robot-wifi-ip>
 ```

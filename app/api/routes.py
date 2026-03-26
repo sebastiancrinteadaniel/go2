@@ -1,18 +1,22 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 import os
+import io
+import cv2
 import psutil
 import asyncio
 import json
 import time
 import logging
+from datetime import datetime
 from aiortc import RTCPeerConnection, RTCSessionDescription
 
 from app.core.config import settings
 from app.services.video import CameraStreamTrack, Go2CameraStreamTrack
 from app.services.telemetry import telemetry
+from app.services.report_generator import ReportData, build_pdf, next_report_id
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +24,7 @@ router = APIRouter()
 
 _active_pc: RTCPeerConnection | None = None
 _active_track: CameraStreamTrack | Go2CameraStreamTrack | None = None
+_active_mode: str = "hd_view"
 
 
 async def close_active_session() -> None:
@@ -57,7 +62,7 @@ async def offer(request: Request):
     """
     Handle WebRTC offer from the frontend to establish a video stream connection.
     """
-    global _active_pc, _active_track
+    global _active_pc, _active_track, _active_mode
 
     await close_active_session()
 
@@ -150,6 +155,7 @@ async def offer(request: Request):
                     )
 
     mode = params.get("mode", "hd_view")
+    _active_mode = mode
 
     if mode == "go2":
         camera_track = Go2CameraStreamTrack()
@@ -166,4 +172,71 @@ async def offer(request: Request):
     await pc.setLocalDescription(answer)
 
     return {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
+
+
+@router.post("/report")
+async def generate_report(request: Request):
+    """
+    Snapshot current session telemetry + a live frame and return a QC PDF download.
+    """
+    body = await request.json()
+    operator = body.get("operator", "Unknown")
+    location = body.get("location", "—")
+
+    cpu = psutil.cpu_percent(interval=None)
+    ram = psutil.virtual_memory()
+    uptime = int(time.time() - psutil.boot_time())
+
+    motor_temps = telemetry.motor_temps
+    avg_temp = sum(motor_temps) / len(motor_temps) if motor_temps else None
+    peak_temp = max(motor_temps) if motor_temps else None
+    peak_joint = None
+    if motor_temps:
+        idx = max(range(len(motor_temps)), key=lambda i: motor_temps[i])
+        peak_joint = JOINT_NAMES[idx] if idx < len(JOINT_NAMES) else f"J{idx}"
+
+    frame_jpeg = None
+    if _active_track is not None:
+        try:
+            frame = await asyncio.wait_for(_active_track.recv(), timeout=2.0)
+            img = frame.to_ndarray(format="bgr24")
+            _, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            frame_jpeg = buf.tobytes()
+        except Exception:
+            pass
+
+    camera_source_map = {"go2": "Go2 Camera", "thermal": "Thermal Camera"}
+    robot_connected = telemetry.connected and (time.time() - telemetry.last_update) < 2.0
+
+    data = ReportData(
+        report_id=next_report_id(),
+        generated_at=datetime.now().astimezone(),
+        operator=operator,
+        location=location,
+        mode=_active_mode,
+        cpu_percent=cpu,
+        ram_percent=ram.percent,
+        uptime_seconds=uptime,
+        battery_soc=telemetry.battery_soc or None,
+        robot_connected=robot_connected,
+        frame_rate=getattr(_active_track, "current_fps", 0.0),
+        camera_source=camera_source_map.get(_active_mode, "Generic USB Cam"),
+        imu_roll_rad=telemetry.imu_rpy[0] if telemetry.imu_rpy else None,
+        imu_pitch_rad=telemetry.imu_rpy[1] if telemetry.imu_rpy else None,
+        imu_yaw_rad=telemetry.imu_rpy[2] if telemetry.imu_rpy else None,
+        detections=getattr(_active_track, "latest_detections", []),
+        motor_temps=motor_temps,
+        avg_temp_c=avg_temp,
+        peak_temp_c=peak_temp,
+        peak_joint_name=peak_joint,
+        frame_jpeg=frame_jpeg,
+    )
+
+    pdf_bytes = build_pdf(data)
+    filename = f"QC-{data.generated_at.strftime('%Y%m%d')}-{data.report_id}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
