@@ -1,5 +1,4 @@
 import csv
-import itertools
 import logging
 from pathlib import Path
 from typing import List, Tuple
@@ -36,6 +35,9 @@ class GestureProcessor:
     _LABEL_COLOR = (0, 255, 0)
     _HAND_COLOR = (255, 255, 255)
 
+    _INFER_W: int = 640
+    _INFER_H: int = 360
+
     def __init__(self):
         self.enabled = False
         self._hands = None
@@ -46,26 +48,27 @@ class GestureProcessor:
         self._ort_session = None
         self._input_name: str = ""
         self._labels: List[str] = []
+        self._norm_buf = np.zeros(42, dtype=np.float32)
 
         self._setup_mediapipe()
         self._load_model_assets()
 
     _HEART_CONF_THRESHOLD = 0.6
 
-    @staticmethod
-    def _normalize_landmarks(landmarks, is_left: bool = False) -> List[float]:
+    def _normalize_landmarks(self, landmarks, is_left: bool = False) -> np.ndarray:
         base_x, base_y = landmarks[0].x, landmarks[0].y
-        coords = []
-        for lm in landmarks:
+        for i, lm in enumerate(landmarks):
             x = lm.x - base_x
             if is_left:
                 x = -x  # mirror left hand so it looks like right hand to the model
-            coords.append([x, lm.y - base_y])
-        flat = list(itertools.chain.from_iterable(coords))
-        max_value = max(map(abs, flat)) if flat else 0.0
-        if max_value <= 0:
-            return [0.0] * len(flat)
-        return [v / max_value for v in flat]
+            self._norm_buf[i * 2] = x
+            self._norm_buf[i * 2 + 1] = lm.y - base_y
+        max_value = float(np.max(np.abs(self._norm_buf)))
+        if max_value > 0:
+            self._norm_buf /= max_value
+        else:
+            self._norm_buf[:] = 0.0
+        return self._norm_buf
 
     def _setup_mediapipe(self) -> None:
         if mp is None:
@@ -136,7 +139,8 @@ class GestureProcessor:
         if self._ort_session is None or not self._labels:
             return "hand", 0.5
         try:
-            input_data = np.array([self._normalize_landmarks(landmarks, is_left)], dtype=np.float32)
+            self._normalize_landmarks(landmarks, is_left)
+            input_data = self._norm_buf[np.newaxis, :]  # shape (1, 42), no copy
             probs = softmax(self._ort_session.run(None, {self._input_name: input_data})[0][0])
             gesture_id = int(np.argmax(probs))
             label = self._labels[gesture_id] if gesture_id < len(self._labels) else "unknown"
@@ -150,8 +154,8 @@ class GestureProcessor:
             return frame, []
 
         frame_out = frame.copy()
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = self._hands.process(rgb)
+        small = cv2.resize(frame, (self._INFER_W, self._INFER_H))
+        results = self._hands.process(cv2.cvtColor(small, cv2.COLOR_BGR2RGB))
 
         if not results or not results.multi_hand_landmarks:
             return frame_out, []
