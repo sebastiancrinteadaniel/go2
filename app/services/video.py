@@ -53,6 +53,7 @@ class CameraStreamTrack(VideoStreamTrack):
         self.yolo_processor = YOLOProcessor()
         self.gesture_processor = GestureProcessor()
         self.latest_detections = []
+        self.session_detections: dict = {}
         self.latest_gestures = []
         self.fps_calc = CvFpsCalc(buffer_len=10)
         self.current_fps = 0.0
@@ -90,6 +91,10 @@ class CameraStreamTrack(VideoStreamTrack):
                 continue
             if self.yolo_processor.enabled:
                 annotated, detections = self.yolo_processor.process(frame)
+                for det in detections:
+                    cls = det.get("class", "")
+                    if cls and (cls not in self.session_detections or det.get("conf", 0) > self.session_detections[cls].get("conf", 0)):
+                        self.session_detections[cls] = det
             else:
                 annotated, detections = frame, []
             if self.gesture_processor.enabled:
@@ -149,6 +154,7 @@ class Go2CameraStreamTrack(VideoStreamTrack):
 
         self.yolo_processor = YOLOProcessor()
         self.gesture_processor = GestureProcessor()
+        self.session_detections: dict = {}
         self.gesture_dispatcher = GestureDispatcher(
             enabled=True,
             cooldown_seconds=settings.GESTURE_DISPATCH_COOLDOWN,
@@ -227,6 +233,10 @@ class Go2CameraStreamTrack(VideoStreamTrack):
                 continue
             if self.yolo_processor.enabled:
                 annotated, detections = self.yolo_processor.process(frame)
+                for det in detections:
+                    cls = det.get("class", "")
+                    if cls and (cls not in self.session_detections or det.get("conf", 0) > self.session_detections[cls].get("conf", 0)):
+                        self.session_detections[cls] = det
             else:
                 annotated, detections = frame, []
             if self.gesture_processor.enabled:

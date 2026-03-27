@@ -23,7 +23,7 @@ class YOLOProcessor:
     def process(self, frame):
         if not self.enabled or _model is None:
             return frame, []
-        
+
         results = _model(frame, imgsz=_IMGSZ, conf=_CONF, verbose=False)
         result = results[0]
         try:

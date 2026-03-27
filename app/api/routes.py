@@ -195,6 +195,7 @@ async def generate_report(request: Request):
         idx = max(range(len(motor_temps)), key=lambda i: motor_temps[i])
         peak_joint = JOINT_NAMES[idx] if idx < len(JOINT_NAMES) else f"J{idx}"
 
+    report_detections = list(getattr(_active_track, "session_detections", {}).values())
     frame_jpeg = None
     if _active_track is not None:
         try:
@@ -224,7 +225,7 @@ async def generate_report(request: Request):
         imu_roll_rad=telemetry.imu_rpy[0] if telemetry.imu_rpy else None,
         imu_pitch_rad=telemetry.imu_rpy[1] if telemetry.imu_rpy else None,
         imu_yaw_rad=telemetry.imu_rpy[2] if telemetry.imu_rpy else None,
-        detections=getattr(_active_track, "latest_detections", []),
+        detections=report_detections,
         motor_temps=motor_temps,
         avg_temp_c=avg_temp,
         peak_temp_c=peak_temp,
