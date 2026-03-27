@@ -593,6 +593,27 @@ body {
     color: var(--accent-yellow);
 }
 
+.status-unknown {
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.status-unknown .dc-state {
+    color: #a78bfa;
+}
+
+.dc-new-badge {
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #7c3aed;
+    background: rgba(139, 92, 246, 0.2);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    border-radius: 3px;
+    padding: 1px 5px;
+    line-height: 1.4;
+}
+
 .dc-conf {
     color: var(--text-secondary);
     font-family: 'JetBrains Mono', monospace;

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import math
-import threading
+import secrets
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -50,11 +51,10 @@ JOINT_NAMES = ["FR_0","FR_1","FR_2","FL_0","FL_1","FL_2","RR_0","RR_1","RR_2","R
 _STATUS_COLORS = {
     "PRESENT": "#22c55e", "OK": "#22c55e", "CONNECTED": "#22c55e",
     "DAMAGED": "#f97316", "WARNING": "#f97316",
-    "MISSING": "#ef4444", "CRITICAL": "#ef4444", "DISCONNECTED": "#ef4444", "LOW": "#ef4444", "HIGH": "#ef4444",
+    "MISSING": "#ef4444", "NOT DETECTED": "#ef4444", "CRITICAL": "#ef4444",
+    "DISCONNECTED": "#ef4444", "LOW": "#ef4444", "HIGH": "#ef4444",
+    "NEW": "#a855f7",
 }
-
-_counter_lock = threading.Lock()
-
 
 @dataclass
 class ReportData:
@@ -82,12 +82,7 @@ class ReportData:
 
 
 def next_report_id() -> str:
-    path = Path("reports/counter.txt")
-    path.parent.mkdir(exist_ok=True)
-    with _counter_lock:
-        n = int(path.read_text().strip()) + 1 if path.exists() else 1
-        path.write_text(str(n))
-    return f"{datetime.now().year}-{n:03d}"
+    return f"{datetime.now().year}-{secrets.token_hex(3).upper()}"
 
 
 def _fmt(v, spec=".1f", fallback="--") -> str:
@@ -164,20 +159,86 @@ def _table(rows, col_widths, header=None) -> Table:
     return t
 
 
+def _load_components() -> list:
+    path = Path(__file__).parent.parent / "static/components.json"
+    if not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text()).get("components", [])
+    except Exception:
+        return []
+
+
 def _enrich(detections: list) -> list:
     return [{**d, "_status": _detection_status(d)} for d in detections]
+
+
+def _reconcile_components(detections: list) -> list:
+    """
+    Merge the known component list with actual detections.
+    Each known component gets status PRESENT, DAMAGED, or NOT DETECTED.
+    Detections that don't match any known component are appended as-is.
+    """
+    components = _load_components()
+    matched_det_indices: set[int] = set()
+    rows = []
+
+    for comp in components:
+        yolo_cls   = {c.lower() for c in comp.get("yolo_classes", [])}
+        damaged_cls = {c.lower() for c in comp.get("damaged_classes", [])}
+        matched_det = None
+        for i, d in enumerate(detections):
+            label = (d.get("class") or d.get("label") or "").lower()
+            if label in damaged_cls:
+                matched_det = d
+                matched_det_indices.add(i)
+                break
+            if label in yolo_cls:
+                matched_det = d
+                matched_det_indices.add(i)
+
+        if matched_det is not None:
+            label_raw = (matched_det.get("class") or matched_det.get("label") or "").lower()
+            status = "DAMAGED" if label_raw in damaged_cls else "PRESENT"
+            conf = matched_det.get("conf") or matched_det.get("confidence")
+        else:
+            status = "NOT DETECTED"
+            conf = None
+
+        rows.append({
+            "label": comp["label"],
+            "_status": status,
+            "conf": conf,
+        })
+
+    # Append any detections not matched to a known component — mark as NEW
+    for i, d in enumerate(detections):
+        if i not in matched_det_indices:
+            label = (d.get("class") or d.get("label") or "Unknown").replace("_", " ").title()
+            conf = d.get("conf") or d.get("confidence")
+            rows.append({
+                "label": label,
+                "_status": "NEW",
+                "conf": conf,
+            })
+
+    return rows
 
 
 def _findings(data: ReportData, enriched: list) -> list:
     items = []
     for d in enriched:
-        label = (d.get("class") or d.get("label") or "Unknown").replace("_", " ").title()
-        if d["_status"] == "MISSING":
+        label = d.get("label") or (d.get("class") or "Unknown").replace("_", " ").title()
+        if d["_status"] in ("MISSING", "NOT DETECTED"):
             items.append(f"<b>{label}</b> — not detected in inspection frame. Manual verification required.")
         elif d["_status"] == "DAMAGED":
             conf = d.get("conf") or d.get("confidence")
             conf_str = f", conf. {int(float(conf) * 100)}%" if conf is not None else ""
             items.append(f"<b>{label}</b> — detected as DAMAGED{conf_str}. Schedule maintenance before next cycle.")
+        elif d["_status"] == "NEW":
+            conf = d.get("conf") or d.get("confidence")
+            conf_str = f" (conf. {int(float(conf) * 100)}%)" if conf is not None else ""
+            items.append(f"<b>{label}</b> — unknown component detected{conf_str}. Not present in component registry — review and add if valid.")
 
     for i, temp in enumerate(data.motor_temps or []):
         j = JOINT_NAMES[i] if i < len(JOINT_NAMES) else f"J{i}"
@@ -196,18 +257,20 @@ def _findings(data: ReportData, enriched: list) -> list:
 def _recommendations(data: ReportData, enriched: list) -> list:
     recs = []
     for d in enriched:
-        label = (d.get("class") or d.get("label") or "Unknown").replace("_", " ").title()
-        if d["_status"] == "MISSING":
+        label = d.get("label") or (d.get("class") or "Unknown").replace("_", " ").title()
+        if d["_status"] in ("MISSING", "NOT DETECTED"):
             recs.append(f"Locate or replace {label} — not detected during inspection.")
         elif d["_status"] == "DAMAGED":
             recs.append(f"Inspect and service {label} — flagged as DAMAGED.")
+        elif d["_status"] == "NEW":
+            recs.append(f"Review {label} — detected but not in component registry. Add to components.json if valid.")
 
     hot = [JOINT_NAMES[i] if i < len(JOINT_NAMES) else f"J{i}" for i, t in enumerate(data.motor_temps or []) if t > 40]
     if hot:
         recs.append(f"Re-scan thermal zone around {', '.join(hot)} for heat source / insulation issue.")
     if data.battery_soc is not None and data.battery_soc < 20:
         recs.append("Return robot to charging station immediately.")
-    if any(d["_status"] != "PRESENT" for d in enriched):
+    if any(d["_status"] in ("MISSING", "NOT DETECTED", "DAMAGED") for d in enriched):
         recs.append("Re-run inspection after corrective actions are completed.")
     if not recs:
         recs.append("No corrective actions required. Schedule routine follow-up inspection.")
@@ -303,24 +366,24 @@ def build_pdf(data: ReportData) -> bytes:
         _imu_row("Yaw",   data.imu_yaw_rad),
     ], [CW * 0.25, CW * 0.375, CW * 0.375], header=["Axis", "Value (°)", "Value (rad)"]), Spacer(1, 4 * mm)]
 
-    enriched = _enrich(data.detections)
-    if enriched:
-        det_rows = []
-        for d in enriched:
-            label = (d.get("class") or d.get("label") or "Unknown").replace("_", " ").title()
-            conf  = d.get("conf") or d.get("confidence")
-            det_rows.append([label, _badge(d["_status"]), f"{int(float(conf) * 100)}%" if conf is not None else "--", "—"])
-        n_ok  = sum(1 for d in enriched if d["_status"] == "PRESENT")
-        n_mis = sum(1 for d in enriched if d["_status"] == "MISSING")
-        n_dmg = sum(1 for d in enriched if d["_status"] == "DAMAGED")
-    else:
-        det_rows = [["No detections in current session", _p("—"), "—", "—"]]
-        n_ok = n_mis = n_dmg = 0
+    enriched = _reconcile_components(data.detections)
+    det_rows = []
+    for d in enriched:
+        label = d.get("label") or (d.get("class") or "Unknown").replace("_", " ").title()
+        conf  = d.get("conf") or d.get("confidence")
+        det_rows.append([label, _badge(d["_status"]), f"{int(float(conf) * 100)}%" if conf is not None else "--", "—"])
+    n_ok  = sum(1 for d in enriched if d["_status"] == "PRESENT")
+    n_mis = sum(1 for d in enriched if d["_status"] in ("MISSING", "NOT DETECTED"))
+    n_dmg = sum(1 for d in enriched if d["_status"] == "DAMAGED")
+    n_new = sum(1 for d in enriched if d["_status"] == "NEW")
 
     story += _section_bar("5. INDUSTRIAL COMPONENT DETECTION")
     story.append(_table(det_rows, [CW * 0.40, CW * 0.20, CW * 0.20, CW * 0.20], header=["Component", "Status", "Confidence", "Notes"]))
-    if enriched:
-        story += [Spacer(1, 1 * mm), _p(f"Present: {n_ok}  |  Missing: {n_mis}  |  Damaged: {n_dmg}  |  Total: {len(enriched)}", S_SUMMARY)]
+    summary_parts = [f"Present: {n_ok}", f"Not Detected: {n_mis}", f"Damaged: {n_dmg}"]
+    if n_new:
+        summary_parts.append(f"New: {n_new}")
+    summary_parts.append(f"Total: {len(enriched)}")
+    story += [Spacer(1, 1 * mm), _p("  |  ".join(summary_parts), S_SUMMARY)]
     story.append(Spacer(1, 4 * mm))
 
     if data.motor_temps:

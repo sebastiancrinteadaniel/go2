@@ -39,6 +39,99 @@ document.addEventListener("DOMContentLoaded", () => {
   let pingInterval;
   let lastPingTime = 0;
 
+  // Component manifest + session state
+  let componentManifest = [];       // [{ id, label, yolo_classes, damaged_classes }]
+  let classLookup = {};             // normalised class string → { id, type: "present"|"damaged" }
+  let componentState = {};          // id → { status: "missing"|"present"|"damaged", conf }
+  let unknownState = {};            // normalised label → { label, conf } — sticky unknowns
+
+  function normaliseClass(s) {
+    return s.toLowerCase().replace(/_/g, " ").trim();
+  }
+
+  function buildClassLookup() {
+    classLookup = {};
+    componentManifest.forEach((comp) => {
+      (comp.yolo_classes || []).forEach((cls) => {
+        classLookup[normaliseClass(cls)] = { id: comp.id, type: "present" };
+      });
+      (comp.damaged_classes || []).forEach((cls) => {
+        classLookup[normaliseClass(cls)] = { id: comp.id, type: "damaged" };
+      });
+    });
+  }
+
+  function initComponentState() {
+    componentState = {};
+    componentManifest.forEach((comp) => {
+      componentState[comp.id] = { status: "missing", conf: 0 };
+    });
+    unknownState = {};
+    renderComponentList();
+  }
+
+  function getStatusIconPath(status) {
+    if (status === "missing") return "/static/icons/status-missing.svg";
+    if (status === "damaged") return "/static/icons/status-damaged.svg";
+    if (status === "present") return "/static/icons/status-present.svg";
+    return "";
+  }
+
+  function buildCard(label, status, conf) {
+    const confStr = conf > 0 ? `CONF: ${Math.round(conf * 100)}%` : "";
+    const cssClass =
+      status === "present" ? "status-present" :
+      status === "damaged" ? "status-warning" :
+      status === "unknown" ? "status-unknown" :
+      "status-missing";
+    const stateLabel =
+      status === "present" ? "PRESENT" :
+      status === "damaged" ? "DAMAGED" :
+      status === "unknown" ? "?" :
+      "MISSING";
+    const iconPath = getStatusIconPath(status);
+    const iconHtml = iconPath
+      ? `<img src="${iconPath}" class="status-icon" alt="${stateLabel}" onerror="this.style.display='none'" />`
+      : "";
+    const newBadge = status === "unknown" ? `<span class="dc-new-badge">NEW</span>` : "";
+    return `
+      <div class="detection-card ${cssClass}">
+        <div class="dc-header">
+          <h4>${label}</h4>
+          ${iconHtml}
+        </div>
+        <div class="dc-footer">
+          <span class="dc-state">${stateLabel}</span>
+          <span style="display:flex;align-items:center;gap:0.4rem;">${newBadge}<span class="dc-conf">${confStr}</span></span>
+        </div>
+      </div>`;
+  }
+
+  function renderComponentList() {
+    if (!componentList) return;
+    componentList.innerHTML = "";
+    componentManifest.forEach((comp) => {
+      const state = componentState[comp.id] || { status: "missing", conf: 0 };
+      componentList.insertAdjacentHTML("beforeend", buildCard(comp.label, state.status, state.conf));
+    });
+    Object.values(unknownState).forEach((unk) => {
+      componentList.insertAdjacentHTML("beforeend", buildCard(unk.label, "unknown", unk.conf));
+    });
+  }
+
+  // Load manifest immediately — cards render as "missing" on load
+  fetch("/static/components.json")
+    .then((r) => r.json())
+    .then((data) => {
+      componentManifest = data.components || [];
+      buildClassLookup();
+      initComponentState();
+    })
+    .catch(() => {
+      componentManifest = [];
+      classLookup = {};
+    });
+
   const expandIconSvg = `
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="15 3 21 3 21 9"></polyline>
@@ -269,11 +362,7 @@ document.addEventListener("DOMContentLoaded", () => {
               sysUptime.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }
             if (componentList) {
-              const merged = [
-                ...(data.detections || []),
-                ...(data.gestures || []),
-              ];
-              updateDetections(merged);
+              updateDetections(data.detections || []);
             }
             if (camFps && data.fps !== undefined) {
               camFps.textContent = data.fps.toFixed(1);
@@ -425,6 +514,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (pingInterval) {
         clearInterval(pingInterval);
       }
+      initComponentState();
     }
   });
 
@@ -531,86 +621,33 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function getStatusIconPath(status) {
-    if (status === "missing") {
-      return "/static/icons/status-missing.svg";
-    }
-    if (status === "damaged") {
-      return "/static/icons/status-damaged.svg";
-    }
-    return "/static/icons/status-present.svg";
-  }
-
   function updateDetections(detections) {
     if (!componentList) return;
 
-    // Group detections by class name and get the highest confidence
-    const uniqueDets = {};
     detections.forEach((d) => {
       if (!d.class) return;
-      // Capitalize the class name nicely
-      const readableName = d.class
-        .replace("gesture:", "Gesture ")
-        .replace(/_/g, " ");
-      const clsName = readableName.charAt(0).toUpperCase() + readableName.slice(1);
-      if (!uniqueDets[clsName] || uniqueDets[clsName] < d.conf) {
-        uniqueDets[clsName] = d.conf;
-      }
-    });
+      const norm = normaliseClass(d.class);
+      const match = classLookup[norm];
 
-    // Update existing cards or create new ones
-    Object.keys(uniqueDets).forEach((clsName) => {
-      let confPercent = Math.round(uniqueDets[clsName] * 100);
-
-      let existingCards = Array.from(componentList.querySelectorAll('.detection-card'));
-      let foundCard = existingCards.find((card) => {
-        let title = card.querySelector('h4');
-        return title && title.textContent === clsName;
-      });
-
-      if (foundCard) {
-        // Update the card if it exists (handles both hardcoded and dynamic)
-        foundCard.className = 'detection-card status-present';
-        foundCard.querySelector('.dc-state').textContent = 'PRESENT';
-        foundCard.querySelector('.dc-conf').textContent = `CONF: ${confPercent}%`;
-        const statusIcon = foundCard.querySelector('.status-icon');
-        if (statusIcon) {
-          statusIcon.src = getStatusIconPath('present');
-          statusIcon.alt = 'Present';
+      if (match) {
+        const cur = componentState[match.id];
+        if (match.type === "damaged") {
+          // damaged always wins and stays
+          componentState[match.id] = { status: "damaged", conf: d.conf };
+        } else if (cur && cur.status !== "damaged") {
+          // present upgrades from missing; never downgrades from damaged
+          componentState[match.id] = { status: "present", conf: d.conf };
         }
       } else {
-        // Create a new dynamic card specifically for computer vision targets
-        const cardHTML = `
-            <div class="detection-card status-present" data-dynamic="true">
-              <div class="dc-header">
-                <h4>${clsName}</h4>
-                <img src="${getStatusIconPath('present')}" class="status-icon" alt="Present"
-                  onerror="this.style.display='none'" />
-              </div>
-              <div class="dc-footer">
-                <span class="dc-state">PRESENT</span>
-                <span class="dc-conf">CONF: ${confPercent}%</span>
-              </div>
-            </div>
-        `;
-        // Insert at the top of the list so it's easily noticeable
-        componentList.insertAdjacentHTML('afterbegin', cardHTML);
-      }
-    });
-
-    // Set dynamic cards to missing if no longer detected by YOLO (doesn't wipe hardcoded ones)
-    let dynamicCards = Array.from(componentList.querySelectorAll('.detection-card[data-dynamic="true"]'));
-    dynamicCards.forEach((card) => {
-      let title = card.querySelector('h4').textContent;
-      if (!uniqueDets[title]) {
-        card.className = 'detection-card status-missing';
-        card.querySelector('.dc-state').textContent = 'MISSING';
-        const statusIcon = card.querySelector('.status-icon');
-        if (statusIcon) {
-          statusIcon.src = getStatusIconPath('missing');
-          statusIcon.alt = 'Missing';
+        // Not in manifest — sticky unknown "?" for the session
+        const readable = d.class.replace(/_/g, " ");
+        const label = readable.charAt(0).toUpperCase() + readable.slice(1);
+        if (!unknownState[norm] || d.conf > unknownState[norm].conf) {
+          unknownState[norm] = { label, conf: d.conf };
         }
       }
     });
+
+    renderComponentList();
   }
 });
