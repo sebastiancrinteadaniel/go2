@@ -166,7 +166,7 @@ class GestureDispatcher:
     def _action_pinkie(self) -> None:
         if self._sport_client is None:
             return
-        self._sport_client.Stretch()
+        # self._sport_client.Stretch()
         # self._sport_client.Sit()
         # self._sport_client.RiseSit()
         # self._sport_client.Content()

@@ -543,8 +543,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const reportBtn = document.getElementById("btn-report");
   if (reportBtn) {
     reportBtn.addEventListener("click", async () => {
-      const operator = prompt("Operator name:", "A. BOCA") ?? "Unknown";
-      const location = prompt("Location / Zone:", "—") ?? "—";
+      const operator = prompt("Operator name:", "A. BOCA");
+      if (operator === null) return;
+      const location = prompt("Location / Zone:", "HANNOVER MESSE");
+      if (location === null) return;
 
       reportBtn.disabled = true;
       reportBtn.textContent = "GENERATING...";

@@ -303,7 +303,9 @@ def build_pdf(data: ReportData) -> bytes:
     text_col_w = CW - logo_col_w
     header_tbl = Table([[
         logo_cell,
-        [_p("QUADRUPED C2 — INDUSTRIAL INSPECTION QC REPORT", S_TITLE),
+        [_p("QUADRUPED C2", S_TITLE),
+         _p("INDUSTRIAL INSPECTION QC REPORT", S_TITLE),
+         Spacer(1, 1 * mm),
          _p(f"Report ID: QC-{data.report_id}  |  {ts}  |  Operator: {data.operator}", S_SUB)],
     ]], colWidths=[logo_col_w, text_col_w])
     header_tbl.setStyle(TableStyle([
