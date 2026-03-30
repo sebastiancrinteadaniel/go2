@@ -153,6 +153,15 @@ class GestureProcessor:
             probs = softmax(self._ort_session.run(None, {self._input_name: input_data})[0][0])
             gesture_id = int(np.argmax(probs))
             label = self._labels[gesture_id] if gesture_id < len(self._labels) else "unknown"
+
+            # The rotation normalization makes Like/Dislike nearly identical in feature space
+            # (both end up with thumb above center after normalization). Use raw y-coordinates
+            # to disambiguate: thumb tip above wrist → Like, below wrist → Dislike.
+            if label in ("Like", "Dislike"):
+                thumb_tip_y = landmarks[4].y
+                wrist_y = landmarks[0].y
+                label = "Like" if thumb_tip_y < wrist_y else "Dislike"
+
             return label, float(probs[gesture_id])
         except Exception as e:
             logger.debug(f"Classification error: {e}")
