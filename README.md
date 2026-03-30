@@ -107,7 +107,7 @@ Settings are loaded from a `.env` file (or environment variables) via Pydantic S
 
 ### Recognized gestures
 
-The ONNX keypoint classifier recognizes 10 hand poses. MediaPipe first detects hand landmarks, then the classifier runs on the normalized 21-point skeleton — so lighting and skin tone don't matter, only the shape of your hand.
+The ONNX keypoint classifier recognizes 14 hand poses. MediaPipe first detects hand landmarks, then the classifier runs on the normalized 21-point skeleton — so lighting and skin tone don't matter, only the shape of your hand.
 
 | Label | Shape | How to form it |
 |-------|-------|----------------|
@@ -120,7 +120,11 @@ The ONNX keypoint classifier recognizes 10 hand poses. MediaPipe first detects h
 | `Three` | --- | Thumb + pinky folded |
 | `Four` | --- | All four fingers up, thumb folded in across palm |
 | `FingerHeart` | 🫰 | Thumb and index finger crossed to form a small heart |
-| `HeartHalf` | 🫶 | One hand curved inward — combine both hands' HeartHalf to make a full ❤️ |
+| `HeartHalf` | 🫶 | One hand curved inward — combine both hands' HeartHalf to make a full heart |
+| `Pinkie` | --- | Only pinky finger extended, others curled |
+| `Three2` | --- | Thumb, index, and middle fingers up, ring and pinky folded |
+| `Rock` | 🤘 | Index and pinky fingers up, middle and ring folded, thumb tucked |
+| `Ok` | 👌 | Thumb and index tip touching to form a circle, other fingers extended |
 
 > The model is trained on right-hand poses. Left hands are automatically mirrored before classification so the same gestures work on both hands.
 
@@ -135,8 +139,9 @@ When `unitree_sdk2py` is available, five of the recognized gestures are wired to
 | `PeaceSign` | ✌️ | Hello wave |
 | `FingerHeart` | 🫰 | Heart pose |
 | `HeartHalf` × 2 | 🫶🫶 | Heart pose (both hands detected simultaneously) |
+| `Pinkie` | 🤙 | Stretch (swap the comment in `_action_pinkie` to test other actions) |
 
-`Open`, `Closed`, `One`, `Three`, and `Four` are classified and shown on screen but do not currently trigger any robot action — they are available for extension.
+`Open`, `Closed`, `One`, `Three`, `Four`, `Three2`, `Rock`, and `Ok` are classified and shown on screen but do not currently trigger any robot action — they are available for extension.
 
 A gesture must be held stable for `GESTURE_DISPATCH_MIN_STABLE_FRAMES` frames at or above `GESTURE_DISPATCH_MIN_CONFIDENCE` before it fires. Both a per-gesture and a global cooldown prevent repeated triggers.
 

@@ -59,6 +59,7 @@ class GestureDispatcher:
                 "peacesign": self._action_peace_sign,
                 "heart": self._action_heart,
                 "fingerheart": self._action_heart,
+                "pinkie": self._action_pinkie,
             }
             logger.info(
                 "Gesture dispatcher initialized (cooldown=%.2fs, global_cooldown=%.2fs, min_confidence=%.2f, min_stable_frames=%d).",
@@ -161,3 +162,19 @@ class GestureDispatcher:
         if self._sport_client is None:
             return
         self._sport_client.Hello()
+
+    def _action_pinkie(self) -> None:
+        if self._sport_client is None:
+            return
+        self._sport_client.Stretch()
+        # self._sport_client.Sit()
+        # self._sport_client.RiseSit()
+        # self._sport_client.Content()
+        # self._sport_client.Scrape()
+        # self._sport_client.Dance1()
+        # self._sport_client.Dance2()
+        # self._sport_client.FrontFlip()
+        # self._sport_client.BackFlip()
+        # self._sport_client.FrontJump()
+        # self._sport_client.HandStand(True)
+        # self._sport_client.RecoveryStand()

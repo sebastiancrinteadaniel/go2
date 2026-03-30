@@ -1,5 +1,7 @@
 import csv
+import itertools
 import logging
+import math
 from pathlib import Path
 from typing import List, Tuple
 
@@ -48,27 +50,34 @@ class GestureProcessor:
         self._ort_session = None
         self._input_name: str = ""
         self._labels: List[str] = []
-        self._norm_buf = np.zeros(42, dtype=np.float32)
-
         self._setup_mediapipe()
         self._load_model_assets()
 
     _HEART_CONF_THRESHOLD = 0.6
+    _HEART_PROXIMITY_RATIO = 0.20  # fraction of frame width
 
-    def _normalize_landmarks(self, landmarks, is_left: bool = False) -> np.ndarray:
+    @staticmethod
+    def _normalize_landmarks(landmarks, is_left: bool = False) -> List[float]:
         base_x, base_y = landmarks[0].x, landmarks[0].y
-        for i, lm in enumerate(landmarks):
-            x = lm.x - base_x
-            if is_left:
-                x = -x  # mirror left hand so it looks like right hand to the model
-            self._norm_buf[i * 2] = x
-            self._norm_buf[i * 2 + 1] = lm.y - base_y
-        max_value = float(np.max(np.abs(self._norm_buf)))
-        if max_value > 0:
-            self._norm_buf /= max_value
-        else:
-            self._norm_buf[:] = 0.0
-        return self._norm_buf
+        coords = [[lm.x - base_x, lm.y - base_y] for lm in landmarks]
+
+        # Rotate so wrist-to-MCP9 axis points upward
+        mcp9_x, mcp9_y = coords[9]
+        angle = math.atan2(mcp9_x, -mcp9_y)
+        cos_a, sin_a = math.cos(angle), math.sin(angle)
+        coords = [
+            [x * cos_a + y * sin_a, -x * sin_a + y * cos_a]
+            for x, y in coords
+        ]
+
+        if is_left:
+            coords = [[-x, y] for x, y in coords]
+
+        scale = math.hypot(coords[9][0], coords[9][1])
+        if scale > 0:
+            coords = [[x / scale, y / scale] for x, y in coords]
+
+        return list(itertools.chain.from_iterable(coords))
 
     def _setup_mediapipe(self) -> None:
         if mp is None:
@@ -86,7 +95,7 @@ class GestureProcessor:
 
         self._hands = self._mp_hands.Hands(
             static_image_mode=False,
-            max_num_hands=2,
+            max_num_hands=10,
             model_complexity=0,
             min_detection_confidence=0.8,
             min_tracking_confidence=0.5,
@@ -139,8 +148,8 @@ class GestureProcessor:
         if self._ort_session is None or not self._labels:
             return "hand", 0.5
         try:
-            self._normalize_landmarks(landmarks, is_left)
-            input_data = self._norm_buf[np.newaxis, :]  # shape (1, 42), no copy
+            landmark_list = self._normalize_landmarks(landmarks, is_left)
+            input_data = np.array([landmark_list], dtype=np.float32)
             probs = softmax(self._ort_session.run(None, {self._input_name: input_data})[0][0])
             gesture_id = int(np.argmax(probs))
             label = self._labels[gesture_id] if gesture_id < len(self._labels) else "unknown"
@@ -205,10 +214,11 @@ class GestureProcessor:
             hand_centers.append((cx, cy))
             hand_top_ys.append(y1 - 60)
 
+            label_color = (0, 0, 255) if label == "FingerHeart" else self._LABEL_COLOR
             cv2.putText(
                 frame_out, f"{label} ({conf * 100:.1f}%)",
                 (x1, max(20, y1 - 40)),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.85, self._LABEL_COLOR, 2, cv2.LINE_AA,
+                cv2.FONT_HERSHEY_SIMPLEX, 0.85, label_color, 2, cv2.LINE_AA,
             )
 
             if handedness_str:
@@ -220,11 +230,19 @@ class GestureProcessor:
 
             gestures.append({"class": f"gesture:{label}", "conf": conf, "bbox": (x1, y1, x2, y2)})
 
+        proximity_ok = (
+            len(hand_centers) == 2
+            and math.hypot(
+                hand_centers[0][0] - hand_centers[1][0],
+                hand_centers[0][1] - hand_centers[1][1],
+            ) <= w * self._HEART_PROXIMITY_RATIO
+        )
         if (
             len(hand_labels) == 2
             and "HeartHalf" in self._labels
             and all(lbl == "HeartHalf" for lbl in hand_labels)
             and all(c >= self._HEART_CONF_THRESHOLD for c in hand_confs)
+            and proximity_ok
         ):
             anchor_x = (hand_centers[0][0] + hand_centers[1][0]) // 2
             anchor_y = min(hand_top_ys) - 20
