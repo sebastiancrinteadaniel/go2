@@ -41,6 +41,8 @@ class GestureDispatcher:
 
         self._sport_client: Optional[Any] = None
         self._gesture_actions: Dict[str, Callable[[], None]] = {}
+        self._last_dispatch: Optional[dict] = None
+        self._dispatch_event_lock = threading.Lock()
         self._init_client_and_actions()
 
     def _init_client_and_actions(self) -> None:
@@ -132,10 +134,19 @@ class GestureDispatcher:
             daemon=True,
         ).start()
 
+    def pop_last_dispatch(self) -> Optional[dict]:
+        """Return and clear the last dispatched gesture event, or None if none since last call."""
+        with self._dispatch_event_lock:
+            ev = self._last_dispatch
+            self._last_dispatch = None
+            return ev
+
     def _run_action(self, label: str, confidence: float, action: Callable[[], None]) -> None:
         try:
             action()
             logger.info("Gesture dispatched: %s (conf=%.2f)", label, confidence)
+            with self._dispatch_event_lock:
+                self._last_dispatch = {"label": label, "conf": round(confidence, 2)}
         except Exception as e:
             logger.error("Gesture action failed for %s: %s", label, e)
         finally:

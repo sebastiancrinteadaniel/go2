@@ -23,6 +23,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const sysPeakTemp = document.getElementById("sys-peak-temp");
   const componentList = document.getElementById("component-list");
   const imuUnitToggle = document.getElementById("imu-unit-toggle");
+  const gestureToast = document.getElementById("gesture-toast");
+  const gestureToastLabel = document.getElementById("gesture-toast-label");
+  const gestureToastAction = document.getElementById("gesture-toast-action");
+  const gestureToastBar = document.getElementById("gesture-toast-bar");
 
   // State
   let isConnected = false;
@@ -38,6 +42,49 @@ document.addEventListener("DOMContentLoaded", () => {
   let dc = null;
   let pingInterval;
   let lastPingTime = 0;
+  let gestureToastTimeout = null;
+
+  const GESTURE_INFO = {
+    like:        { label: "THUMBS UP",    action: "STAND UP + WALK" },
+    dislike:     { label: "THUMBS DOWN",  action: "STOP + SIT DOWN" },
+    peacesign:   { label: "PEACE SIGN",   action: "WAVE HELLO" },
+    heart:       { label: "HEART",        action: "HEART POSE" },
+    fingerheart: { label: "FINGER HEART", action: "HEART POSE" },
+    pinkie:      { label: "PINKIE",       action: "PINKIE GESTURE" },
+  };
+
+  const GESTURE_COOLDOWN_MS = 2000;
+
+  // // --- MOCK: remove before prod ---
+  // const MOCK_GESTURES = ["like", "dislike", "peacesign", "heart", "fingerheart", "pinkie"];
+  // let mockIdx = 0;
+  // setTimeout(function fireMock() {
+  //   const g = MOCK_GESTURES[mockIdx % MOCK_GESTURES.length];
+  //   showGestureToast(g, 0.85 + Math.random() * 0.14);
+  //   mockIdx++;
+  //   setTimeout(fireMock, 3500);
+  // }, 800);
+  // // --- END MOCK ---
+
+  function showGestureToast(label, conf) {
+    if (!gestureToast) return;
+    const info = GESTURE_INFO[label] || { label: label.toUpperCase(), action: "COMMAND SENT" };
+    gestureToastLabel.textContent = `${info.label}  ${Math.round(conf * 100)}%`;
+    gestureToastAction.textContent = info.action;
+
+    // Reset and animate the progress bar drain
+    gestureToastBar.style.transition = "none";
+    gestureToastBar.style.transform = "scaleX(1)";
+    void gestureToastBar.offsetWidth; // force reflow
+    gestureToastBar.style.transition = `transform ${GESTURE_COOLDOWN_MS}ms linear`;
+    gestureToastBar.style.transform = "scaleX(0)";
+
+    gestureToast.classList.remove("hidden");
+    if (gestureToastTimeout) clearTimeout(gestureToastTimeout);
+    gestureToastTimeout = setTimeout(() => {
+      gestureToast.classList.add("hidden");
+    }, GESTURE_COOLDOWN_MS + 300);
+  }
 
   // Component manifest + session state
   let componentManifest = [];       // [{ id, label, yolo_classes, damaged_classes }]
@@ -427,6 +474,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (Array.isArray(data.imu_rpy) && data.imu_rpy.length === 3) {
               lastImuRpy = data.imu_rpy;
               renderImuPose();
+            }
+            if (data.dispatched_gesture) {
+              showGestureToast(data.dispatched_gesture.label, data.dispatched_gesture.conf);
             }
           }
         } catch (e) {

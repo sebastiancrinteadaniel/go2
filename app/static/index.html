@@ -109,6 +109,18 @@
               <span id="cam-latency">--</span> MS
             </div>
 
+            <!-- Gesture dispatch toast (bottom-left, above cam badge) -->
+            <div id="gesture-toast" class="gesture-toast hidden" aria-live="polite">
+              <div class="gesture-toast-dot"></div>
+              <div class="gesture-toast-body">
+                <div class="gesture-toast-label" id="gesture-toast-label">GESTURE</div>
+                <div class="gesture-toast-action" id="gesture-toast-action">ACTION</div>
+              </div>
+              <div class="gesture-toast-progress">
+                <div class="gesture-toast-bar" id="gesture-toast-bar"></div>
+              </div>
+            </div>
+
             <!-- Expand icon (Bottom right) -->
             <div class="video-expand" id="video-expand-btn">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"

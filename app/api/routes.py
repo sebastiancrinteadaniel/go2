@@ -108,6 +108,8 @@ async def offer(request: Request):
                             else f"J{peak_idx}"
                         )
                     
+                    _dispatcher = getattr(camera_track, "gesture_dispatcher", None)
+                    dispatched_gesture = _dispatcher.pop_last_dispatch() if _dispatcher else None
                     data = json.dumps({
                         "type": "stats",
                         "cpu_percent": cpu_percent,
@@ -116,7 +118,8 @@ async def offer(request: Request):
                         "detections": detections,
                         "gestures": gestures,
                         "fps": fps,
-                        "gesture_dispatch_enabled": getattr(getattr(camera_track, "gesture_dispatcher", None), "enabled", False),
+                        "dispatched_gesture": dispatched_gesture,
+                        "gesture_dispatch_enabled": getattr(_dispatcher, "enabled", False),
                         "battery": telemetry.battery_soc,
                         "connected": telemetry.connected and ((time.time() - telemetry.last_update) < 2.0),
                         "motor_temps": motor_temps,
