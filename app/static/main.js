@@ -216,9 +216,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (label === "EXT. CAMERA") {
       return "hd_view";
     }
-    if (label === "THERMAL") {
-      return "thermal";
-    }
     if (label === "SENSOR FUSION") {
       return "sensor_fusion";
     }
@@ -226,9 +223,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function getCamNameForMode(mode) {
-    if (mode === "thermal") {
-      return "THERMAL_CAMERA";
-    }
     if (mode === "sensor_fusion") {
       return "SENSOR_FUSION_CAM";
     }

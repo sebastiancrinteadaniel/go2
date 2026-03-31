@@ -1,6 +1,6 @@
-# Go2 Dashboard (c2-go2)
+# Quadruped C2 — Go2 (c2-go2)
 
-A FastAPI + WebRTC control interface for the Unitree Go2 quadruped robot. Streams live video, displays system telemetry, and supports hand gesture control via MediaPipe + ONNX inference.
+A FastAPI + WebRTC command-and-control interface for the Unitree Go2 quadruped robot. Streams live video, displays system telemetry, supports hand gesture control via MediaPipe + ONNX inference, and generates QC inspection reports.
 
 Designed to run on a **Jetson Orin Nano (8 GB)** mounted on the robot, accessible from any browser over the local network.
 
@@ -55,7 +55,8 @@ Browser
 
 | Path | Purpose |
 |------|---------|
-| `app/api/routes.py` | WebRTC `/offer` endpoint and data channel loop |
+| `app/api/routes.py` | WebRTC `/offer` endpoint, data channel loop, and `/report` endpoint |
+| `app/services/report_generator.py` | Builds QC PDF reports from session telemetry + live frame (ReportLab) |
 | `app/services/video.py` | `CameraStreamTrack` (webcam) and `Go2CameraStreamTrack` (SDK) |
 | `app/services/gesture_processor.py` | MediaPipe hand detection + ONNX keypoint classifier |
 | `app/services/gesture_dispatcher.py` | Maps gestures to robot actions with cooldown throttling |
@@ -72,9 +73,9 @@ Browser
 
 ### Prerequisites
 
-- Python 3.10+ (for edge device 3.8)
+- Python 3.10+
 - [uv](https://github.com/astral-sh/uv) package manager
-- `unitree_sdk2py` — optional, required for Go2 camera and robot control (graceful fallback to webcam mode without it)
+- `unitree_sdk2py` — optional; required for Go2 camera, robot control, and live telemetry (battery, motor temps). Falls back gracefully to webcam mode without it.
 - CUDA / ONNX Runtime GPU — optional, falls back to CPU inference automatically
 
 ### Run
@@ -100,6 +101,28 @@ Settings are loaded from a `.env` file (or environment variables) via Pydantic S
 | `GESTURE_DISPATCH_MIN_STABLE_FRAMES` | `3` | Consecutive matching frames before dispatch |
 | `GESTURE_DISPATCH_COOLDOWN` | `2.0` | Per-gesture cooldown (seconds) |
 | `GESTURE_DISPATCH_GLOBAL_COOLDOWN` | `2.0` | Global cooldown between any two dispatches (seconds) |
+
+---
+
+## Camera Modes
+
+The UI exposes four mode tabs. Select before connecting — the mode is locked while a stream is active.
+
+| Tab | Mode sent to backend | Description |
+|-----|---------------------|-------------|
+| **GO2 CAMERA** | `go2` | Live feed from the Go2 head camera via Unitree SDK. Enables gesture dispatch controls. |
+| **EXT. CAMERA** | `hd_view` | External USB webcam attached to the compute module. |
+| **SENSOR FUSION** | `sensor_fusion` | Placeholder for a fused RGB + depth feed. |
+
+> SENSOR FUSION is a UI placeholder — wire it up in `app/api/routes.py` when the hardware is available.
+
+---
+
+## QC Report
+
+While a stream is active, click **GENERATE QC REPORT** in the sidebar. You will be prompted for an operator name and location/zone. The backend snapshots the current telemetry and a live video frame, then returns a PDF download.
+
+The report includes: operator metadata, timestamp, battery and thermal readings, motor temperature table, component detection summary, and the captured frame.
 
 ---
 
@@ -137,7 +160,7 @@ When `unitree_sdk2py` is available, five of the recognized gestures are wired to
 | `Like` | 👍 | Stand up + free walk |
 | `Dislike` | 👎 | Stop + stand down |
 | `PeaceSign` | ✌️ | Hello wave |
-| `FingerHeart` | 🫰 | Heart pose |
+| `FingerHeart` / `Heart` | 🫰 | Heart pose |
 | `HeartHalf` × 2 | 🫶🫶 | Heart pose (both hands detected simultaneously) |
 | `Pinkie` | 🤙 | Stretch (swap the comment in `_action_pinkie` to test other actions) |
 
