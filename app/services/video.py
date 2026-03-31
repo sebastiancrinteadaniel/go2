@@ -168,28 +168,7 @@ class Go2CameraStreamTrack(VideoStreamTrack):
         self.current_fps = 0.0
 
         self._offline_frame = np.zeros((480, 640, 3), dtype=np.uint8)
-        cv2.putText(
-            self._offline_frame,
-            "GO2 CAMERA UNAVAILABLE",
-            (50, 240),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (0, 0, 255),
-            2,
-            cv2.LINE_AA,
-        )
-
         self._connecting_frame = np.zeros((480, 640, 3), dtype=np.uint8)
-        cv2.putText(
-            self._connecting_frame,
-            "GO2 CAMERA CONNECTING...",
-            (50, 240),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (200, 200, 200),
-            2,
-            cv2.LINE_AA,
-        )
 
         self._initializing = True
         self._stop_event = threading.Event()

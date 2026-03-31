@@ -109,6 +109,22 @@ body {
     align-items: center;
 }
 
+#operator-name[contenteditable] {
+    cursor: text;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.15s;
+    outline: none;
+    min-width: 2ch;
+}
+
+#operator-name[contenteditable]:hover {
+    border-bottom-color: var(--text-secondary);
+}
+
+#operator-name[contenteditable]:focus {
+    border-bottom-color: var(--accent-blue);
+}
+
 .accent-green {
     color: var(--accent-green);
 }
@@ -328,6 +344,12 @@ body {
 
 .mode-badge.active .mode-icon {
     opacity: 1;
+}
+
+.mode-badge.locked {
+    opacity: 0.4;
+    pointer-events: none;
+    cursor: default;
 }
 
 .video-telemetry {

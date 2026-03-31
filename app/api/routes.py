@@ -112,6 +112,8 @@ async def offer(request: Request):
                     dispatched_gesture = _dispatcher.pop_last_dispatch() if _dispatcher else None
                     data = json.dumps({
                         "type": "stats",
+                        "initializing": getattr(camera_track, "_initializing", False),
+                        "camera_connected": getattr(camera_track, "connected", True),
                         "cpu_percent": cpu_percent,
                         "ram_percent": ram.percent,
                         "uptime": uptime_seconds,

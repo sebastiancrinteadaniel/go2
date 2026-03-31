@@ -24,11 +24,11 @@
       <div class="telemetry-bar">
         <div class="telemetry-item">
           <span class="label">OPERATOR</span>
-          <span class="val">A. BOCA</span>
+          <span class="val" id="operator-name" contenteditable="true" spellcheck="false" title="Click to edit operator name">A. BOCA</span>
         </div>
         <div class="telemetry-item">
           <span class="label">CONNECTION</span>
-          <span class="val accent-green" id="sys-connection-wrapper">
+          <span class="val" id="sys-connection-wrapper">
             <span id="sys-connection">-- ms</span>
           </span>
         </div>
@@ -46,7 +46,7 @@
           <span class="label">POWER</span>
           <span class="val accent-yellow" style="gap: 0.4rem;">
             <img src="/static/icons/power.svg" alt="Power" style="width: 16px; height: 16px;"
-              onerror="this.style.display = 'none'" /> <span id="sys-battery">84%</span>
+              onerror="this.style.display = 'none'" /> <span id="sys-battery">--%</span>
           </span>
         </div>
         <div class="telemetry-item">
@@ -81,10 +81,25 @@
               <span>INITIALIZING STREAM...</span>
             </div>
 
+            <div id="camera-error-overlay" class="loading-overlay hidden">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <span id="camera-error-text" style="color: var(--accent-red);">GO2 CAMERA UNAVAILABLE</span>
+              <span style="font-size:0.7rem; color: var(--text-secondary); margin-top: 0.25rem;">CHECK SDK CONNECTION</span>
+            </div>
+
             <div class="video-overlay-text top-center mode-selector-container">
               <div class="mode-badge active">
+                <img src="/static/icons/go2-camera.svg" class="mode-icon" alt=""
+                  onerror="this.style.display = 'none'" />
+                <span>GO2 CAMERA</span>
+              </div>
+              <div class="mode-badge">
                 <img src="/static/icons/hd-view.svg" class="mode-icon" alt="" onerror="this.style.display = 'none'" />
-                <span>HD VIEW</span>
+                <span>EXT. CAMERA</span>
               </div>
               <div class="mode-badge">
                 <img src="/static/icons/thermal.svg" class="mode-icon" alt="" onerror="this.style.display = 'none'" />
@@ -94,11 +109,6 @@
                 <img src="/static/icons/sensor-fusion.svg" class="mode-icon" alt=""
                   onerror="this.style.display = 'none'" />
                 <span>SENSOR FUSION</span>
-              </div>
-              <div class="mode-badge">
-                <img src="/static/icons/go2-camera.svg" class="mode-icon" alt=""
-                  onerror="this.style.display = 'none'" />
-                <span>GO2 CAMERA</span>
               </div>
             </div>
 
@@ -221,7 +231,7 @@
 
               <div class="stream-status" id="dc-status">
                 <div class="status-dot dc-state disconnected"></div>
-                <span class="status-text dc-state disconnected">STREAM STOPPED</span>
+                <span class="status-text dc-state disconnected">LIVE STREAM DISCONNECTED</span>
               </div>
             </div>
           </div>

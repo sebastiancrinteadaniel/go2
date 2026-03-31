@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusText = document.querySelector(".status-text");
   const videoExpandBtn = document.getElementById("video-expand-btn");
   const loadingOverlay = document.getElementById("loading-overlay");
+  const cameraErrorOverlay = document.getElementById("camera-error-overlay");
   const videoFeed = document.getElementById("live-feed");
   const yoloBtn = document.getElementById("yolo-btn");
   const gestureBtn = document.getElementById("gesture-btn");
@@ -23,6 +24,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const sysPeakTemp = document.getElementById("sys-peak-temp");
   const componentList = document.getElementById("component-list");
   const imuUnitToggle = document.getElementById("imu-unit-toggle");
+  const operatorName = document.getElementById("operator-name");
+  if (operatorName) {
+    operatorName.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); operatorName.blur(); }
+    });
+  }
+
   const gestureToast = document.getElementById("gesture-toast");
   const gestureToastLabel = document.getElementById("gesture-toast-label");
   const gestureToastAction = document.getElementById("gesture-toast-action");
@@ -34,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let isGestureEnabled = false;
   let isGestureDispatchEnabled = true;
   let telemetryInterval;
-  let currentMode = "hd_view";
+  let currentMode = "go2";
   let imuInDegrees = true;
   let lastImuRpy = null;
 
@@ -205,6 +213,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (label === "GO2 CAMERA") {
       return "go2";
     }
+    if (label === "EXT. CAMERA") {
+      return "hd_view";
+    }
     if (label === "THERMAL") {
       return "thermal";
     }
@@ -224,7 +235,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (mode === "go2") {
       return "GO2_CAMERA";
     }
-    return "GENERIC_USB_CAM";
+    return "EXT_CAMERA";
   }
 
   function updateModeUI(mode) {
@@ -347,12 +358,15 @@ document.addEventListener("DOMContentLoaded", () => {
         '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"/></svg>';
 
       loadingOverlay.classList.remove("hidden");
+      if (cameraErrorOverlay) cameraErrorOverlay.classList.add("hidden");
 
       pc = new RTCPeerConnection();
       dc = pc.createDataChannel("telemetry");
 
       dc.onopen = () => {
-        loadingOverlay.classList.add("hidden");
+        if (currentMode !== "go2") {
+          loadingOverlay.classList.add("hidden");
+        }
         isConnected = true;
 
         statusDot.classList.remove("disconnected");
@@ -394,14 +408,20 @@ document.addEventListener("DOMContentLoaded", () => {
       dc.onmessage = (event) => {
         if (event.data === "pong") {
           const lat = Date.now() - lastPingTime;
-          if (camLatency) camLatency.textContent = lat;
+          if (camLatency) { camLatency.textContent = lat; applyLatencyColor(camLatency, lat); }
           return;
         }
         try {
           const data = JSON.parse(event.data);
           if (data.type === "stats") {
-            if (sysCpu) sysCpu.textContent = `${data.cpu_percent.toFixed(1)}%`;
-            if (sysRam) sysRam.textContent = `${data.ram_percent.toFixed(1)}%`;
+            if (data.camera_connected === false) {
+              loadingOverlay.classList.add("hidden");
+              if (cameraErrorOverlay) cameraErrorOverlay.classList.remove("hidden");
+            } else if (data.initializing === false && !loadingOverlay.classList.contains("hidden")) {
+              loadingOverlay.classList.add("hidden");
+            }
+            if (sysCpu) { sysCpu.textContent = `${data.cpu_percent.toFixed(1)}%`; applyThresholdColor(sysCpu, data.cpu_percent, 70, 90); }
+            if (sysRam) { sysRam.textContent = `${data.ram_percent.toFixed(1)}%`; applyThresholdColor(sysRam, data.ram_percent, 70, 90); }
             if (sysUptime && data.uptime !== undefined) {
               const hours = Math.floor(data.uptime / 3600);
               const minutes = Math.floor((data.uptime % 3600) / 60);
@@ -490,6 +510,15 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       };
 
+      pc.onconnectionstatechange = () => {
+        if (pc && (pc.connectionState === "failed" || pc.connectionState === "disconnected" || pc.connectionState === "closed")) {
+          doDisconnect();
+        }
+      };
+
+      // Lock mode badges while connected
+      modeBadges.forEach((b) => b.classList.add("locked"));
+
       // Explicitly request to receive video so the backend knows what to negotiate
       pc.addTransceiver("video", { direction: "recvonly" });
 
@@ -515,58 +544,47 @@ document.addEventListener("DOMContentLoaded", () => {
         )
         .catch((err) => {
           console.error("WebRTC Error:", err);
-          loadingOverlay.classList.add("hidden");
-          // Reset UI on failure
-          connectBtn.classList.remove("playing");
-          connectBtn.innerHTML =
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>';
+          doDisconnect();
         });
     } else {
-      // Disconnect
-      isConnected = false;
-      connectBtn.classList.remove("playing");
-      connectBtn.innerHTML =
-        '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>';
-
-      // Update status UI
-      statusDot.classList.add("disconnected");
-      statusDot.classList.remove("connected");
-      statusText.classList.add("disconnected");
-      statusText.classList.remove("connected");
-      statusText.textContent = "LIVE STREAM DISCONNECTED";
-
-      if (yoloBtn) {
-        yoloBtn.style.display = "none";
-      }
-
-      if (gestureBtn) {
-        gestureBtn.style.display = "none";
-      }
-
-      if (gestureDispatchBtn) {
-        gestureDispatchBtn.style.display = "none";
-      }
-
-      if (videoFeed.srcObject) {
-        videoFeed.srcObject.getTracks().forEach((track) => track.stop());
-        videoFeed.srcObject = null;
-      }
-      if (dc) {
-        dc.close();
-        dc = null;
-      }
-      if (pc) {
-        pc.close();
-        pc = null;
-      }
-
-      stopTelemetry();
-      if (pingInterval) {
-        clearInterval(pingInterval);
-      }
-      initComponentState();
+      doDisconnect();
     }
   });
+
+  function doDisconnect() {
+    if (!isConnected && loadingOverlay.classList.contains("hidden")) return;
+    isConnected = false;
+
+    loadingOverlay.classList.add("hidden");
+    if (cameraErrorOverlay) cameraErrorOverlay.classList.add("hidden");
+
+    connectBtn.classList.remove("playing");
+    connectBtn.innerHTML =
+      '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M5 3l14 9-14 9V3z"/></svg>';
+
+    statusDot.classList.add("disconnected");
+    statusDot.classList.remove("connected");
+    statusText.classList.add("disconnected");
+    statusText.classList.remove("connected");
+    statusText.textContent = "LIVE STREAM DISCONNECTED";
+
+    if (yoloBtn) yoloBtn.style.display = "none";
+    if (gestureBtn) gestureBtn.style.display = "none";
+    if (gestureDispatchBtn) gestureDispatchBtn.style.display = "none";
+
+    modeBadges.forEach((b) => b.classList.remove("locked"));
+
+    if (videoFeed.srcObject) {
+      videoFeed.srcObject.getTracks().forEach((track) => track.stop());
+      videoFeed.srcObject = null;
+    }
+    if (dc) { dc.close(); dc = null; }
+    if (pc) { pc.close(); pc = null; }
+
+    stopTelemetry();
+    if (pingInterval) clearInterval(pingInterval);
+    initComponentState();
+  }
 
   // IMU unit toggle
   function renderImuPose() {
@@ -593,7 +611,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const reportBtn = document.getElementById("btn-report");
   if (reportBtn) {
     reportBtn.addEventListener("click", async () => {
-      const operator = prompt("Operator name:", "A. BOCA");
+      const operatorEl = document.getElementById("operator-name");
+      const operator = prompt("Operator name:", operatorEl ? operatorEl.textContent.trim() : "A. BOCA");
       if (operator === null) return;
       const location = prompt("Location / Zone:", "HANNOVER MESSE");
       if (location === null) return;
@@ -653,18 +672,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
   }
 
+  function applyThresholdColor(el, value, warnAt, dangerAt) {
+    if (!el) return;
+    if (value >= dangerAt) el.style.color = "var(--accent-red)";
+    else if (value >= warnAt) el.style.color = "var(--accent-yellow)";
+    else el.style.color = "";
+  }
+
+function applyLatencyColor(el, ms) {
+    if (!el) return;
+    if (ms > 150) el.style.color = "var(--accent-red)";
+    else if (ms > 50) el.style.color = "var(--accent-yellow)";
+    else el.style.color = "var(--accent-green)";
+  }
+
   function stopTelemetry() {
     clearInterval(telemetryInterval);
-    camFps.textContent = "--";
-    camLatency.textContent = "--";
-    if (sysTelemetry) {
-      sysTelemetry.textContent = "-- °C";
+    if (camFps) camFps.textContent = "--";
+    if (camLatency) { camLatency.textContent = "--"; camLatency.style.color = ""; }
+    if (sysCpu) { sysCpu.textContent = "--%"; sysCpu.style.color = ""; }
+    if (sysRam) { sysRam.textContent = "--%"; sysRam.style.color = ""; }
+    if (sysBattery) sysBattery.textContent = "--%";
+    if (sysUptime) sysUptime.textContent = "--:--:--";
+    if (sysConnection) {
+      sysConnection.textContent = "--";
+      sysConnection.parentElement.classList.remove("accent-green", "accent-red");
     }
-    if (sysPeakTemp) {
-      sysPeakTemp.textContent = "-- °C (--)";
-    }
-
-    // Reset pose values
+    if (sysTelemetry) sysTelemetry.textContent = "-- °C";
+    if (sysPeakTemp) sysPeakTemp.textContent = "-- °C (--)";
+    lastImuRpy = null;
     const poseVals = document.querySelectorAll(".pose-value");
     if (poseVals.length >= 3) {
       poseVals[0].textContent = "--";
