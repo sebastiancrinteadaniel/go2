@@ -105,7 +105,6 @@ class CameraSource:
             self._last_gestures = gestures
             self.latest_detections = detections
             self.latest_gestures = gestures
-            self.current_fps = self.fps_calc.get()
 
     def get_latest_frame(self) -> np.ndarray:
         return self._last_frame
@@ -215,7 +214,6 @@ class Go2CameraSource:
             self._last_gestures = gestures
             self.latest_detections = detections
             self.latest_gestures = gestures
-            self.current_fps = self.fps_calc.get()
             self._initializing = False
 
     def get_latest_frame(self) -> np.ndarray:
@@ -239,6 +237,7 @@ class ViewerTrack(VideoStreamTrack):
     async def recv(self):
         pts, time_base = await self.next_timestamp()
         frame = self._source.get_latest_frame()
+        self._source.current_fps = self._source.fps_calc.get()
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         vf = VideoFrame.from_ndarray(frame_rgb, format="rgb24")
         vf.pts = pts

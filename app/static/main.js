@@ -481,6 +481,14 @@ document.addEventListener("DOMContentLoaded", () => {
                 sysConnection.parentElement.classList.add("accent-red");
               }
             }
+            if (data.yolo_enabled !== undefined) {
+              isYoloEnabled = !!data.yolo_enabled;
+              setToggleButtonState(yoloBtn, isYoloEnabled);
+            }
+            if (data.gesture_enabled !== undefined) {
+              isGestureEnabled = !!data.gesture_enabled;
+              setToggleButtonState(gestureBtn, isGestureEnabled);
+            }
             if (currentMode === "go2" && data.gesture_dispatch_enabled !== undefined) {
               isGestureDispatchEnabled = !!data.gesture_dispatch_enabled;
               setToggleButtonState(gestureDispatchBtn, isGestureDispatchEnabled);

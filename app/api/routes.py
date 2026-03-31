@@ -147,6 +147,8 @@ async def offer(request: Request):
                         "gestures": gestures,
                         "fps": fps,
                         "dispatched_gesture": dispatched_gesture,
+                        "yolo_enabled": source.yolo_processor.enabled,
+                        "gesture_enabled": source.gesture_processor.enabled,
                         "gesture_dispatch_enabled": getattr(_dispatcher, "enabled", False),
                         "battery": telemetry.battery_soc,
                         "connected": telemetry.connected and ((time.time() - telemetry.last_update) < 2.0),
