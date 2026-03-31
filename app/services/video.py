@@ -41,9 +41,10 @@ def _safe_put(q: queue.Queue, item) -> None:
     q.put_nowait(item)
 
 
-class CameraStreamTrack(VideoStreamTrack):
+class CameraSource:
+    """Webcam capture + inference pipeline. Shared across all viewer connections."""
+
     def __init__(self):
-        super().__init__()
         self.cap = cv2.VideoCapture(0)
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, settings.CAMERA_WIDTH)
@@ -60,7 +61,6 @@ class CameraStreamTrack(VideoStreamTrack):
 
         self._stop_event = threading.Event()
         self._frame_queue: queue.Queue = queue.Queue(maxsize=1)
-        self._result_queue: queue.Queue = queue.Queue(maxsize=1)
         self._last_frame: np.ndarray = np.zeros(
             (settings.CAMERA_HEIGHT, settings.CAMERA_WIDTH, 3), dtype=np.uint8
         )
@@ -69,9 +69,7 @@ class CameraStreamTrack(VideoStreamTrack):
 
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
-        self._inference_thread = threading.Thread(
-            target=self._inference_loop, daemon=True
-        )
+        self._inference_thread = threading.Thread(target=self._inference_loop, daemon=True)
         self._inference_thread.start()
 
     def _capture_loop(self) -> None:
@@ -102,39 +100,26 @@ class CameraStreamTrack(VideoStreamTrack):
             else:
                 gestures = []
 
-            _safe_put(self._result_queue, (annotated, detections, gestures))
-
-    async def recv(self):
-        pts, time_base = await self.next_timestamp()
-        try:
-            frame, detections, gestures = self._result_queue.get_nowait()
-            self._last_frame = frame
+            self._last_frame = annotated
             self._last_detections = detections
             self._last_gestures = gestures
-        except queue.Empty:
-            frame = self._last_frame
-            detections = self._last_detections
-            gestures = self._last_gestures
+            self.latest_detections = detections
+            self.latest_gestures = gestures
+            self.current_fps = self.fps_calc.get()
 
-        self.latest_detections = detections
-        self.latest_gestures = gestures
-        self.current_fps = self.fps_calc.get()
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        new_frame = VideoFrame.from_ndarray(frame, format="rgb24")
-        new_frame.pts = pts
-        new_frame.time_base = time_base
-        return new_frame
+    def get_latest_frame(self) -> np.ndarray:
+        return self._last_frame
 
     def stop(self):
         self._stop_event.set()
         self.gesture_processor.stop()
         self.cap.release()
-        super().stop()
 
 
-class Go2CameraStreamTrack(VideoStreamTrack):
+class Go2CameraSource:
+    """Go2 SDK camera + inference pipeline. Shared across all viewer connections."""
+
     def __init__(self):
-        super().__init__()
         try:
             from unitree_sdk2py.go2.video.video_client import VideoClient
 
@@ -144,11 +129,13 @@ class Go2CameraStreamTrack(VideoStreamTrack):
             self.connected = True
             logger.info("Unitree SDK VideoClient initialized successfully.")
         except ImportError:
+            self.client = None
             self.connected = False
             logger.warning(
                 "'unitree_sdk2py' not found. Ensure it is installed for the Go2 camera stream to work."
             )
         except Exception as e:
+            self.client = None
             self.connected = False
             logger.error(f"Error initializing Go2 VideoClient: {e}")
 
@@ -169,20 +156,18 @@ class Go2CameraStreamTrack(VideoStreamTrack):
 
         self._offline_frame = np.zeros((480, 640, 3), dtype=np.uint8)
         self._connecting_frame = np.zeros((480, 640, 3), dtype=np.uint8)
-
         self._initializing = True
         self._stop_event = threading.Event()
         self._frame_queue: queue.Queue = queue.Queue(maxsize=3)
-        self._result_queue: queue.Queue = queue.Queue(maxsize=3)
-        self._last_frame: np.ndarray = self._connecting_frame.copy() if self.connected else self._offline_frame.copy()
+        self._last_frame: np.ndarray = (
+            self._connecting_frame.copy() if self.connected else self._offline_frame.copy()
+        )
         self._last_detections: list = []
         self._last_gestures: list = []
 
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
-        self._inference_thread = threading.Thread(
-            target=self._inference_loop, daemon=True
-        )
+        self._inference_thread = threading.Thread(target=self._inference_loop, daemon=True)
         self._inference_thread.start()
 
     def _capture_loop(self) -> None:
@@ -225,35 +210,37 @@ class Go2CameraStreamTrack(VideoStreamTrack):
 
             self.gesture_dispatcher.process(gestures)
 
-            self._initializing = False
-            _safe_put(self._result_queue, (annotated, detections, gestures))
-
-    async def recv(self):
-        pts, time_base = await self.next_timestamp()
-        try:
-            frame, detections, gestures = self._result_queue.get_nowait()
-            self._last_frame = frame
+            self._last_frame = annotated
             self._last_detections = detections
             self._last_gestures = gestures
-        except queue.Empty:
-            if self._initializing:
-                frame = self._connecting_frame if self.connected else self._offline_frame
-            else:
-                frame = self._last_frame
-            detections = self._last_detections
-            gestures = self._last_gestures
+            self.latest_detections = detections
+            self.latest_gestures = gestures
+            self.current_fps = self.fps_calc.get()
+            self._initializing = False
 
-        self.latest_detections = detections
-        self.latest_gestures = gestures
-        self.current_fps = self.fps_calc.get()
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        new_frame = VideoFrame.from_ndarray(frame, format="rgb24")
-        new_frame.pts = pts
-        new_frame.time_base = time_base
-        return new_frame
+    def get_latest_frame(self) -> np.ndarray:
+        if self._initializing:
+            return self._connecting_frame if self.connected else self._offline_frame
+        return self._last_frame
 
     def stop(self):
         self._stop_event.set()
         self.gesture_processor.stop()
-        self.client = None  # stop capture loop from calling GetImageSample()
-        super().stop()
+        self.client = None
+
+
+class ViewerTrack(VideoStreamTrack):
+    """One WebRTC video track per viewer. Reads frames from a shared camera source."""
+
+    def __init__(self, source: "CameraSource | Go2CameraSource"):
+        super().__init__()
+        self._source = source
+
+    async def recv(self):
+        pts, time_base = await self.next_timestamp()
+        frame = self._source.get_latest_frame()
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        vf = VideoFrame.from_ndarray(frame_rgb, format="rgb24")
+        vf.pts = pts
+        vf.time_base = time_base
+        return vf

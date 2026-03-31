@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from app.api.routes import router, close_active_session
+from app.api.routes import router, close_all
 
 from app.core.config import settings
 from app.core.logger import setup_logger
@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    await close_active_session()
+    await close_all()
     logger.info("Active WebRTC session closed on shutdown.")
 
 

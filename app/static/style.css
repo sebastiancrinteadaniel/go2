@@ -26,10 +26,23 @@ body {
     overflow: hidden;
 }
 
+@media (max-width: 900px) {
+    body {
+        overflow-y: auto;
+    }
+}
+
 .dashboard-container {
     display: flex;
     flex-direction: column;
     height: 100vh;
+}
+
+@media (max-width: 900px) {
+    .dashboard-container {
+        height: auto;
+        min-height: 100vh;
+    }
 }
 
 /* TOP BAR */
@@ -1002,6 +1015,165 @@ body {
 
 @media (max-width: 900px) {
     .sidebar {
-        display: none;
+        display: flex;
+        width: 100%;
+        flex-direction: column;
+        gap: 0.75rem;
+        overflow: visible;
+    }
+
+    .sidebar-scroll {
+        overflow: visible;
+        min-height: 0;
+    }
+
+    .sidebar-footer {
+        padding-bottom: 0.5rem;
+    }
+}
+
+@media (max-width: 900px) {
+    /* Top bar: stack brand + telemetry vertically */
+    .top-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        height: auto;
+        padding: 0.75rem 1rem;
+        gap: 0.6rem;
+    }
+
+    .telemetry-bar {
+        width: 100%;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.5rem;
+    }
+
+    .telemetry-item {
+        min-width: 0;
+    }
+
+    .val {
+        font-size: 0.65rem;
+    }
+
+    /* Main layout: stack vertically */
+    .main-content {
+        flex-direction: column;
+        overflow: visible;
+        padding: 0.75rem;
+        gap: 0.75rem;
+    }
+
+    /* Video: full width, natural 16:9 */
+    .video-section {
+        flex: none;
+    }
+
+    .video-container {
+        aspect-ratio: 16 / 9;
+        border-radius: 6px;
+    }
+
+    /* Mode badges: smaller, wrap if needed */
+    .mode-selector-container {
+        gap: 0.25rem;
+        padding: 0.25rem 0.4rem;
+        flex-wrap: wrap;
+        top: 0.5rem;
+    }
+
+    .mode-badge {
+        padding: 0.3rem 0.55rem;
+        font-size: 0.6rem;
+        gap: 0.25rem;
+    }
+
+    .mode-icon {
+        width: 11px;
+        height: 11px;
+    }
+
+    /* Cam telemetry badge: smaller text */
+    .video-telemetry {
+        font-size: 0.6rem;
+        padding: 0.35rem 0.55rem;
+        bottom: 0.6rem;
+        left: 0.6rem;
+    }
+
+    .video-expand {
+        bottom: 0.6rem;
+        right: 0.6rem;
+        padding: 0.45rem;
+    }
+
+    /* Gesture toast: sit above the cam badge */
+    .gesture-toast {
+        bottom: 3.2rem;
+        left: 0.6rem;
+        min-width: 160px;
+    }
+
+    /* IMU panel: auto height, tighter */
+    .pose-overlay {
+        height: auto;
+        padding: 0.75rem;
+    }
+
+    .pose-grid {
+        gap: 0.5rem;
+    }
+
+    .pose-card {
+        padding: 0.5rem 0;
+    }
+
+    .pose-value {
+        font-size: 0.9rem;
+    }
+
+    /* Bottom bar: wrap controls */
+    .bottom-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.6rem;
+        min-height: auto;
+        padding: 0.75rem;
+    }
+
+    .bottom-bar-left {
+        flex-direction: column;
+        gap: 0.6rem;
+        width: 100%;
+    }
+
+    .bottom-control-group {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .vision-control-group {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        padding-left: 0;
+        border-left: none;
+        border-top: 1px solid var(--border-color);
+        padding-top: 0.5rem;
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .secondary-btn {
+        font-size: 0.6rem;
+        padding: 0.5rem 0.7rem;
+    }
+
+    .stream-status {
+        padding-left: 0;
+        border-left: none;
+        border-top: 1px solid var(--border-color);
+        padding-top: 0.5rem;
+        width: 100%;
     }
 }

@@ -14,7 +14,7 @@ from datetime import datetime
 from aiortc import RTCPeerConnection, RTCSessionDescription
 
 from app.core.config import settings
-from app.services.video import CameraStreamTrack, Go2CameraStreamTrack
+from app.services.video import CameraSource, Go2CameraSource, ViewerTrack
 from app.services.telemetry import telemetry
 from app.services.report_generator import ReportData, build_pdf, next_report_id
 
@@ -22,20 +22,31 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_active_pc: RTCPeerConnection | None = None
-_active_track: CameraStreamTrack | Go2CameraStreamTrack | None = None
+_active_source: CameraSource | Go2CameraSource | None = None
+_active_pcs: set[RTCPeerConnection] = set()
 _active_mode: str = "hd_view"
 
 
-async def close_active_session() -> None:
-    """Tear down the current WebRTC session and release the camera."""
-    global _active_pc, _active_track
-    if _active_track is not None:
-        _active_track.stop()
-        _active_track = None
-    if _active_pc is not None:
-        await _active_pc.close()
-        _active_pc = None
+async def _close_pc(pc: RTCPeerConnection) -> None:
+    """Remove a single peer connection. Stop the source only when no viewers remain."""
+    global _active_source, _active_pcs
+    _active_pcs.discard(pc)
+    await pc.close()
+    if not _active_pcs and _active_source is not None:
+        _active_source.stop()
+        _active_source = None
+
+
+async def close_all() -> None:
+    """Tear down all peer connections and release the camera source."""
+    global _active_source, _active_pcs
+    for pc in list(_active_pcs):
+        await pc.close()
+    _active_pcs.clear()
+    if _active_source is not None:
+        _active_source.stop()
+        _active_source = None
+
 
 JOINT_NAMES = [
     "FR_0", "FR_1", "FR_2",
@@ -61,23 +72,38 @@ async def index():
 async def offer(request: Request):
     """
     Handle WebRTC offer from the frontend to establish a video stream connection.
+    Multiple viewers can connect simultaneously — they share one camera source.
     """
-    global _active_pc, _active_track, _active_mode
-
-    await close_active_session()
+    global _active_source, _active_pcs, _active_mode
 
     params = await request.json()
-    offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
+    mode = params.get("mode", "hd_view")
+
+    # If the mode changed, tear down everything and start fresh
+    if mode != _active_mode and _active_source is not None:
+        await close_all()
+
+    _active_mode = mode
+
+    # Start the shared camera source once; reuse it for subsequent viewers
+    if _active_source is None:
+        if mode == "go2":
+            _active_source = Go2CameraSource()
+        else:
+            _active_source = CameraSource()
+        telemetry.init()
+
+    source = _active_source
+
+    offer_desc = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
     pc = RTCPeerConnection()
+    _active_pcs.add(pc)
 
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
         logger.info("WebRTC connection state: %s", pc.connectionState)
-        if pc.connectionState in ("failed", "closed"):
-            await close_active_session()
-
-    # Initialize telemetry when WebRTC connection is established
-    telemetry.init()
+        if pc.connectionState in ("failed", "closed", "disconnected"):
+            await _close_pc(pc)
 
     @pc.on("datachannel")
     def on_datachannel(channel):
@@ -89,9 +115,9 @@ async def offer(request: Request):
                     cpu_percent = psutil.cpu_percent(interval=None)
                     ram = psutil.virtual_memory()
                     uptime_seconds = int(time.time() - psutil.boot_time())
-                    fps = getattr(camera_track, "current_fps", 0.0)
-                    detections = getattr(camera_track, "latest_detections", [])
-                    gestures = getattr(camera_track, "latest_gestures", [])
+                    fps = getattr(source, "current_fps", 0.0)
+                    detections = getattr(source, "latest_detections", [])
+                    gestures = getattr(source, "latest_gestures", [])
                     motor_temps = telemetry.motor_temps
                     avg_temp_c = (
                         sum(motor_temps) / len(motor_temps)
@@ -107,13 +133,13 @@ async def offer(request: Request):
                             if peak_idx < len(JOINT_NAMES)
                             else f"J{peak_idx}"
                         )
-                    
-                    _dispatcher = getattr(camera_track, "gesture_dispatcher", None)
+
+                    _dispatcher = getattr(source, "gesture_dispatcher", None)
                     dispatched_gesture = _dispatcher.pop_last_dispatch() if _dispatcher else None
                     data = json.dumps({
                         "type": "stats",
-                        "initializing": getattr(camera_track, "_initializing", False),
-                        "camera_connected": getattr(camera_track, "connected", True),
+                        "initializing": getattr(source, "_initializing", False),
+                        "camera_connected": getattr(source, "connected", True),
                         "cpu_percent": cpu_percent,
                         "ram_percent": ram.percent,
                         "uptime": uptime_seconds,
@@ -147,11 +173,11 @@ async def offer(request: Request):
             if message == "ping":
                 channel.send("pong")
             elif message == "toggle_yolo":
-                camera_track.yolo_processor.enabled = not camera_track.yolo_processor.enabled
+                source.yolo_processor.enabled = not source.yolo_processor.enabled
             elif message == "toggle_gesture":
-                camera_track.gesture_processor.enabled = not camera_track.gesture_processor.enabled
+                source.gesture_processor.enabled = not source.gesture_processor.enabled
             elif message == "toggle_gesture_dispatch":
-                dispatcher = getattr(camera_track, "gesture_dispatcher", None)
+                dispatcher = getattr(source, "gesture_dispatcher", None)
                 if dispatcher is not None:
                     dispatcher.enabled = not dispatcher.enabled
                     logger.info(
@@ -159,20 +185,10 @@ async def offer(request: Request):
                         "enabled" if dispatcher.enabled else "disabled",
                     )
 
-    mode = params.get("mode", "hd_view")
-    _active_mode = mode
+    viewer_track = ViewerTrack(source)
+    pc.addTrack(viewer_track)
 
-    if mode == "go2":
-        camera_track = Go2CameraStreamTrack()
-    else:
-        camera_track = CameraStreamTrack()
-
-    _active_pc = pc
-    _active_track = camera_track
-
-    pc.addTrack(camera_track)
-
-    await pc.setRemoteDescription(offer)
+    await pc.setRemoteDescription(offer_desc)
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
 
@@ -200,18 +216,17 @@ async def generate_report(request: Request):
         idx = max(range(len(motor_temps)), key=lambda i: motor_temps[i])
         peak_joint = JOINT_NAMES[idx] if idx < len(JOINT_NAMES) else f"J{idx}"
 
-    report_detections = list(getattr(_active_track, "session_detections", {}).values())
+    report_detections = list(getattr(_active_source, "session_detections", {}).values())
     frame_jpeg = None
-    if _active_track is not None:
+    if _active_source is not None:
         try:
-            frame = await asyncio.wait_for(_active_track.recv(), timeout=2.0)
-            img = frame.to_ndarray(format="bgr24")
-            _, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            frame = _active_source.get_latest_frame()
+            _, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
             frame_jpeg = buf.tobytes()
         except Exception:
             pass
 
-    camera_source_map = {"go2": "Go2 Camera", "thermal": "Thermal Camera"}
+    camera_source_map = {"go2": "Go2 Camera"}
     robot_connected = telemetry.connected and (time.time() - telemetry.last_update) < 2.0
 
     data = ReportData(
@@ -225,7 +240,7 @@ async def generate_report(request: Request):
         uptime_seconds=uptime,
         battery_soc=telemetry.battery_soc or None,
         robot_connected=robot_connected,
-        frame_rate=getattr(_active_track, "current_fps", 0.0),
+        frame_rate=getattr(_active_source, "current_fps", 0.0),
         camera_source=camera_source_map.get(_active_mode, "Generic USB Cam"),
         imu_roll_rad=telemetry.imu_rpy[0] if telemetry.imu_rpy else None,
         imu_pitch_rad=telemetry.imu_rpy[1] if telemetry.imu_rpy else None,
@@ -245,4 +260,3 @@ async def generate_report(request: Request):
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
-
