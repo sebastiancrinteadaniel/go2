@@ -117,6 +117,7 @@ async def offer(request: Request):
                     uptime_seconds = int(time.time() - psutil.boot_time())
                     fps = getattr(source, "current_fps", 0.0)
                     detections = getattr(source, "latest_detections", [])
+                    weapons_detections = getattr(source, "latest_weapons_detections", [])
                     gestures = getattr(source, "latest_gestures", [])
                     motor_temps = telemetry.motor_temps
                     avg_temp_c = (
@@ -144,10 +145,12 @@ async def offer(request: Request):
                         "ram_percent": ram.percent,
                         "uptime": uptime_seconds,
                         "detections": detections,
+                        "weapons_detections": weapons_detections,
                         "gestures": gestures,
                         "fps": fps,
                         "dispatched_gesture": dispatched_gesture,
                         "yolo_enabled": source.yolo_processor.enabled,
+                        "weapons_enabled": source.weapons_processor.enabled,
                         "gesture_enabled": source.gesture_processor.enabled,
                         "gesture_dispatch_enabled": getattr(_dispatcher, "enabled", False),
                         "battery": telemetry.battery_soc,
@@ -176,6 +179,8 @@ async def offer(request: Request):
                 channel.send("pong")
             elif message == "toggle_yolo":
                 source.yolo_processor.enabled = not source.yolo_processor.enabled
+            elif message == "toggle_weapons":
+                source.weapons_processor.enabled = not source.weapons_processor.enabled
             elif message == "toggle_gesture":
                 source.gesture_processor.enabled = not source.gesture_processor.enabled
             elif message == "toggle_gesture_dispatch":

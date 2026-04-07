@@ -10,6 +10,7 @@ from av import VideoFrame
 from app.core.config import settings
 
 from app.services.yolo_processor import YOLOProcessor
+from app.services.weapons_processor import WeaponsProcessor
 from app.services.gesture_processor import GestureProcessor
 from app.services.gesture_dispatcher import GestureDispatcher
 
@@ -52,8 +53,10 @@ class CameraSource:
         self.cap.set(cv2.CAP_PROP_FPS, settings.CAMERA_FPS)
 
         self.yolo_processor = YOLOProcessor()
+        self.weapons_processor = WeaponsProcessor()
         self.gesture_processor = GestureProcessor()
         self.latest_detections = []
+        self.latest_weapons_detections = []
         self.session_detections: dict = {}
         self.latest_gestures = []
         self.fps_calc = CvFpsCalc(buffer_len=10)
@@ -64,8 +67,6 @@ class CameraSource:
         self._last_frame: np.ndarray = np.zeros(
             (settings.CAMERA_HEIGHT, settings.CAMERA_WIDTH, 3), dtype=np.uint8
         )
-        self._last_detections: list = []
-        self._last_gestures: list = []
 
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
@@ -81,6 +82,7 @@ class CameraSource:
 
     def _inference_loop(self) -> None:
         self.yolo_processor.warmup()
+        self.weapons_processor.warmup()
         self.gesture_processor.warmup()
         while not self._stop_event.is_set():
             try:
@@ -95,15 +97,18 @@ class CameraSource:
                         self.session_detections[cls] = det
             else:
                 annotated, detections = frame, []
+            if self.weapons_processor.enabled:
+                annotated, weapons_detections = self.weapons_processor.process(annotated)
+            else:
+                weapons_detections = []
             if self.gesture_processor.enabled:
                 annotated, gestures = self.gesture_processor.process(annotated)
             else:
                 gestures = []
 
             self._last_frame = annotated
-            self._last_detections = detections
-            self._last_gestures = gestures
             self.latest_detections = detections
+            self.latest_weapons_detections = weapons_detections
             self.latest_gestures = gestures
 
     def get_latest_frame(self) -> np.ndarray:
@@ -139,6 +144,7 @@ class Go2CameraSource:
             logger.error(f"Error initializing Go2 VideoClient: {e}")
 
         self.yolo_processor = YOLOProcessor()
+        self.weapons_processor = WeaponsProcessor()
         self.gesture_processor = GestureProcessor()
         self.session_detections: dict = {}
         self.gesture_dispatcher = GestureDispatcher(
@@ -149,6 +155,7 @@ class Go2CameraSource:
             min_stable_frames=settings.GESTURE_DISPATCH_MIN_STABLE_FRAMES,
         )
         self.latest_detections = []
+        self.latest_weapons_detections = []
         self.latest_gestures = []
         self.fps_calc = CvFpsCalc(buffer_len=10)
         self.current_fps = 0.0
@@ -161,8 +168,6 @@ class Go2CameraSource:
         self._last_frame: np.ndarray = (
             self._connecting_frame.copy() if self.connected else self._offline_frame.copy()
         )
-        self._last_detections: list = []
-        self._last_gestures: list = []
 
         self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._capture_thread.start()
@@ -188,6 +193,7 @@ class Go2CameraSource:
 
     def _inference_loop(self) -> None:
         self.yolo_processor.warmup()
+        self.weapons_processor.warmup()
         self.gesture_processor.warmup()
         while not self._stop_event.is_set():
             try:
@@ -202,6 +208,10 @@ class Go2CameraSource:
                         self.session_detections[cls] = det
             else:
                 annotated, detections = frame, []
+            if self.weapons_processor.enabled:
+                annotated, weapons_detections = self.weapons_processor.process(annotated)
+            else:
+                weapons_detections = []
             if self.gesture_processor.enabled:
                 annotated, gestures = self.gesture_processor.process(annotated)
             else:
@@ -210,9 +220,8 @@ class Go2CameraSource:
             self.gesture_dispatcher.process(gestures)
 
             self._last_frame = annotated
-            self._last_detections = detections
-            self._last_gestures = gestures
             self.latest_detections = detections
+            self.latest_weapons_detections = weapons_detections
             self.latest_gestures = gestures
             self._initializing = False
 

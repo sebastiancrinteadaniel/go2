@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const yoloBtn = document.getElementById("yolo-btn");
   const gestureBtn = document.getElementById("gesture-btn");
   const gestureDispatchBtn = document.getElementById("gesture-dispatch-btn");
+  const weaponsBtn = document.getElementById("weapons-btn");
 
   const camName = document.getElementById("cam-name");
   const camFps = document.getElementById("cam-fps");
@@ -41,6 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let isYoloEnabled = false;
   let isGestureEnabled = false;
   let isGestureDispatchEnabled = true;
+  let isWeaponsEnabled = false;
   let telemetryInterval;
   let currentMode = "go2";
   let imuInDegrees = true;
@@ -343,6 +345,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  if (weaponsBtn) {
+    weaponsBtn.addEventListener("click", () => {
+      isWeaponsEnabled = !isWeaponsEnabled;
+      setToggleButtonState(weaponsBtn, isWeaponsEnabled);
+      if (dc && dc.readyState === "open") {
+        dc.send("toggle_weapons");
+      }
+    });
+  }
+
   // Connect Button Handling
   connectBtn.addEventListener("click", () => {
     if (!isConnected) {
@@ -388,12 +400,21 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
 
+        if (weaponsBtn) {
+          weaponsBtn.style.display = "flex";
+          setToggleButtonState(weaponsBtn, isWeaponsEnabled);
+        }
+
         if (isYoloEnabled) {
           dc.send("toggle_yolo");
         }
 
         if (isGestureEnabled) {
           dc.send("toggle_gesture");
+        }
+
+        if (isWeaponsEnabled) {
+          dc.send("toggle_weapons");
         }
 
         startTelemetry();
@@ -485,6 +506,10 @@ document.addEventListener("DOMContentLoaded", () => {
               isYoloEnabled = !!data.yolo_enabled;
               setToggleButtonState(yoloBtn, isYoloEnabled);
             }
+            if (data.weapons_enabled !== undefined) {
+              isWeaponsEnabled = !!data.weapons_enabled;
+              setToggleButtonState(weaponsBtn, isWeaponsEnabled);
+            }
             if (data.gesture_enabled !== undefined) {
               isGestureEnabled = !!data.gesture_enabled;
               setToggleButtonState(gestureBtn, isGestureEnabled);
@@ -573,6 +598,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (yoloBtn) yoloBtn.style.display = "none";
     if (gestureBtn) gestureBtn.style.display = "none";
     if (gestureDispatchBtn) gestureDispatchBtn.style.display = "none";
+    if (weaponsBtn) weaponsBtn.style.display = "none";
 
     modeBadges.forEach((b) => b.classList.remove("locked"));
 
