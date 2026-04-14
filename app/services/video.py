@@ -16,6 +16,41 @@ from app.services.gesture_processor import GestureProcessor
 from app.services.gesture_dispatcher import GestureDispatcher
 from app.services.person_role_tracker import PersonRoleTracker
 
+_WEAPON_THREAT_COLOR = (30, 30, 220)   # red  — actual threat
+_WEAPON_AUTH_COLOR = (50, 205, 50)     # green — in guard's possession
+
+
+def _draw_and_classify_weapons(frame, weapon_detections, role_tracker):
+    """
+    Draw weapon bboxes context-aware on frame:
+      - green "AUTHORIZED" if the weapon overlaps a tracked guard
+      - red   "<class>"    otherwise (actual threat)
+
+    Returns only the threat detections so authorized weapons are suppressed
+    from the UI threat list.
+    """
+    threat_weapons = []
+    for wdet in weapon_detections:
+        x1, y1, x2, y2 = wdet["bbox"]
+        authorized = role_tracker.is_weapon_authorized(wdet["bbox"])
+        if authorized:
+            color = _WEAPON_AUTH_COLOR
+            label = f"AUTHORIZED {wdet['conf']:.2f}"
+        else:
+            color = _WEAPON_THREAT_COLOR
+            label = f"{wdet['class'].upper().replace('_', ' ')} {wdet['conf']:.2f}"
+            threat_weapons.append(wdet)
+
+        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.85, 1)
+        cv2.rectangle(frame, (x1, y1 - th - 8), (x1 + tw + 6, y1), color, -1)
+        cv2.putText(
+            frame, label, (x1 + 3, y1 - 4),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.85, (255, 255, 255), 1, cv2.LINE_AA,
+        )
+
+    return threat_weapons
+
 logger = logging.getLogger(__name__)
 
 
@@ -104,8 +139,12 @@ class CameraSource:
                         self.session_detections[cls] = det
             else:
                 annotated, detections = frame, []
+                self.person_role_tracker.clear_active()
             if self.weapons_processor.enabled:
-                annotated, weapons_detections = self.weapons_processor.process(annotated)
+                _, raw_weapons = self.weapons_processor.process(annotated)
+                weapons_detections = _draw_and_classify_weapons(
+                    annotated, raw_weapons, self.person_role_tracker
+                )
             else:
                 weapons_detections = []
             if self.industrial_processor.enabled:
@@ -225,8 +264,12 @@ class Go2CameraSource:
                         self.session_detections[cls] = det
             else:
                 annotated, detections = frame, []
+                self.person_role_tracker.clear_active()
             if self.weapons_processor.enabled:
-                annotated, weapons_detections = self.weapons_processor.process(annotated)
+                _, raw_weapons = self.weapons_processor.process(annotated)
+                weapons_detections = _draw_and_classify_weapons(
+                    annotated, raw_weapons, self.person_role_tracker
+                )
             else:
                 weapons_detections = []
             if self.industrial_processor.enabled:

@@ -35,10 +35,6 @@ class WeaponsProcessor:
 
         results = _model(frame, imgsz=_IMGSZ, conf=_CONF, verbose=False)
         result = results[0]
-        try:
-            annotated = result.plot()
-        except Exception:
-            annotated = frame
         detections = []
         for box in result.boxes:
             cls_id = int(box.cls[0])
@@ -52,7 +48,9 @@ class WeaponsProcessor:
                     "bbox": (int(x1), int(y1), int(x2), int(y2)),
                 }
             )
-        return annotated, detections
+        # Drawing is handled by the caller (video.py) so weapon boxes can be
+        # coloured based on whether they are associated with a guard or not.
+        return frame, detections
 
     def warmup(self) -> None:
         if _model is None:

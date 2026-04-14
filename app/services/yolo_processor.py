@@ -69,14 +69,14 @@ class YOLOProcessor:
             label = f"{cls_name} {conf:.2f}"
             cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
             (tw, th), _ = cv2.getTextSize(
-                label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1
+                label, cv2.FONT_HERSHEY_SIMPLEX, 0.85, 1
             )
             cv2.rectangle(
-                annotated, (x1, y1 - th - 6), (x1 + tw + 4, y1), color, -1
+                annotated, (x1, y1 - th - 8), (x1 + tw + 6, y1), color, -1
             )
             cv2.putText(
-                annotated, label, (x1 + 2, y1 - 3),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA,
+                annotated, label, (x1 + 3, y1 - 4),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.85, (255, 255, 255), 1, cv2.LINE_AA,
             )
 
         return annotated, detections
