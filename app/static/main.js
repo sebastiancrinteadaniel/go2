@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const gestureBtn = document.getElementById("gesture-btn");
   const gestureDispatchBtn = document.getElementById("gesture-dispatch-btn");
   const weaponsBtn = document.getElementById("weapons-btn");
+  const industrialBtn = document.getElementById("industrial-btn");
 
   const camName = document.getElementById("cam-name");
   const camFps = document.getElementById("cam-fps");
@@ -43,6 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let isGestureEnabled = false;
   let isGestureDispatchEnabled = true;
   let isWeaponsEnabled = false;
+  let isIndustrialEnabled = false;
   let telemetryInterval;
   let currentMode = "go2";
   let imuInDegrees = true;
@@ -355,6 +357,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  if (industrialBtn) {
+    industrialBtn.addEventListener("click", () => {
+      isIndustrialEnabled = !isIndustrialEnabled;
+      setToggleButtonState(industrialBtn, isIndustrialEnabled);
+      if (dc && dc.readyState === "open") {
+        dc.send("toggle_industrial");
+      }
+    });
+  }
+
   // Connect Button Handling
   connectBtn.addEventListener("click", () => {
     if (!isConnected) {
@@ -405,6 +417,11 @@ document.addEventListener("DOMContentLoaded", () => {
           setToggleButtonState(weaponsBtn, isWeaponsEnabled);
         }
 
+        if (industrialBtn) {
+          industrialBtn.style.display = "flex";
+          setToggleButtonState(industrialBtn, isIndustrialEnabled);
+        }
+
         if (isYoloEnabled) {
           dc.send("toggle_yolo");
         }
@@ -415,6 +432,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (isWeaponsEnabled) {
           dc.send("toggle_weapons");
+        }
+
+        if (isIndustrialEnabled) {
+          dc.send("toggle_industrial");
         }
 
         startTelemetry();
@@ -510,6 +531,10 @@ document.addEventListener("DOMContentLoaded", () => {
               isWeaponsEnabled = !!data.weapons_enabled;
               setToggleButtonState(weaponsBtn, isWeaponsEnabled);
             }
+            if (data.industrial_enabled !== undefined) {
+              isIndustrialEnabled = !!data.industrial_enabled;
+              setToggleButtonState(industrialBtn, isIndustrialEnabled);
+            }
             if (data.gesture_enabled !== undefined) {
               isGestureEnabled = !!data.gesture_enabled;
               setToggleButtonState(gestureBtn, isGestureEnabled);
@@ -599,6 +624,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (gestureBtn) gestureBtn.style.display = "none";
     if (gestureDispatchBtn) gestureDispatchBtn.style.display = "none";
     if (weaponsBtn) weaponsBtn.style.display = "none";
+    if (industrialBtn) industrialBtn.style.display = "none";
 
     modeBadges.forEach((b) => b.classList.remove("locked"));
 
