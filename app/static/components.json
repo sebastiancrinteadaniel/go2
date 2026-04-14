@@ -1,40 +1,40 @@
 {
   "components": [
     {
-      "id": "main_pipe_joint",
-      "label": "Main Pipe Joint",
-      "yolo_classes": ["pipe_joint", "pipe joint", "main_pipe_joint", "main pipe joint"],
-      "damaged_classes": ["pipe_joint_damaged", "damaged_pipe_joint", "main_pipe_joint_damaged"]
+      "id": "cell_door",
+      "label": "Cell Door",
+      "yolo_classes": ["cell_door", "door", "cell door", "prison_door"],
+      "damaged_classes": ["door_damaged", "damaged_door", "broken_door", "cell_door_damaged"]
     },
     {
-      "id": "m8_screw_inner",
-      "label": "M8 Screw (Inner)",
-      "yolo_classes": ["m8_screw", "m8 screw", "screw_m8", "screw m8"],
-      "damaged_classes": ["m8_screw_damaged", "damaged_screw", "screw_damaged"]
+      "id": "bunk_bed",
+      "label": "Bunk Bed",
+      "yolo_classes": ["bunk_bed", "bed", "bunk bed", "bunk"],
+      "damaged_classes": ["bed_damaged", "damaged_bed", "bunk_damaged"]
     },
     {
-      "id": "support_bracket",
-      "label": "Support Bracket",
-      "yolo_classes": ["support_bracket", "support bracket", "bracket"],
-      "damaged_classes": ["bracket_damaged", "damaged_bracket", "support_bracket_damaged"]
+      "id": "window_bars",
+      "label": "Window Bars",
+      "yolo_classes": ["window_bars", "bars", "window bars", "window", "iron_bars"],
+      "damaged_classes": ["bars_damaged", "damaged_bars", "broken_bars", "window_bars_damaged"]
     },
     {
-      "id": "pressure_valve",
-      "label": "Pressure Valve",
-      "yolo_classes": ["pressure_valve", "pressure valve", "valve"],
-      "damaged_classes": ["valve_damaged", "damaged_valve", "pressure_valve_damaged"]
+      "id": "security_camera",
+      "label": "Security Camera",
+      "yolo_classes": ["security_camera", "camera", "surveillance_camera", "cctv"],
+      "damaged_classes": ["camera_damaged", "damaged_camera", "security_camera_damaged"]
     },
     {
-      "id": "hex_bolt_b1",
-      "label": "Hex Bolt B1",
-      "yolo_classes": ["hex_bolt", "hex bolt", "bolt_b1", "bolt b1", "hex_bolt_b1"],
-      "damaged_classes": ["bolt_damaged", "damaged_bolt", "hex_bolt_damaged"]
+      "id": "toilet_unit",
+      "label": "Toilet Unit",
+      "yolo_classes": ["toilet", "toilet_unit", "sink", "toilet unit"],
+      "damaged_classes": ["toilet_damaged", "damaged_toilet"]
     },
-        {
-      "id": "person_p1",
-      "label": "Person P1",
-      "yolo_classes": ["person", "human", "man", "woman"],
-      "damaged_classes": ["person_damaged", "damaged_person"]
+    {
+      "id": "table",
+      "label": "Table / Desk",
+      "yolo_classes": ["table", "desk", "bench", "surface"],
+      "damaged_classes": ["table_damaged", "damaged_table", "desk_damaged"]
     }
   ]
 }

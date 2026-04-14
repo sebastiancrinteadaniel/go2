@@ -1,0 +1,29 @@
+{
+  "threats": [
+    {
+      "id": "prisoner",
+      "label": "Prisoner",
+      "yolo_classes": ["prisoner", "inmate", "detainee", "convict"]
+    },
+    {
+      "id": "guard",
+      "label": "Guard / Officer",
+      "yolo_classes": ["guard", "officer", "security_officer", "police", "police_officer", "correction_officer"]
+    },
+    {
+      "id": "firearm",
+      "label": "Firearm",
+      "yolo_classes": ["gun", "firearm", "pistol", "rifle", "handgun", "weapon", "revolver"]
+    },
+    {
+      "id": "knife",
+      "label": "Knife / Blade",
+      "yolo_classes": ["knife", "blade", "shiv", "machete", "dagger", "shank"]
+    },
+    {
+      "id": "phone",
+      "label": "Mobile Phone",
+      "yolo_classes": ["cell_phone", "phone", "mobile_phone", "mobile", "cellphone"]
+    }
+  ]
+}

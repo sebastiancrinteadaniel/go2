@@ -196,6 +196,10 @@ async def offer(request: Request):
                         "Gesture dispatch %s",
                         "enabled" if dispatcher.enabled else "disabled",
                     )
+            elif message == "reset_person_roles":
+                tracker = getattr(source, "person_role_tracker", None)
+                if tracker is not None:
+                    tracker.reset()
 
     viewer_track = ViewerTrack(source)
     pc.addTrack(viewer_track)

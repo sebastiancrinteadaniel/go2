@@ -11,7 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const gestureBtn = document.getElementById("gesture-btn");
   const gestureDispatchBtn = document.getElementById("gesture-dispatch-btn");
   const weaponsBtn = document.getElementById("weapons-btn");
-  const industrialBtn = document.getElementById("industrial-btn");
+  const resetRolesBtn = document.getElementById("reset-roles-btn");
 
   const camName = document.getElementById("cam-name");
   const camFps = document.getElementById("cam-fps");
@@ -25,6 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const sysTelemetry = document.getElementById("sys-telemetry");
   const sysPeakTemp = document.getElementById("sys-peak-temp");
   const componentList = document.getElementById("component-list");
+  const threatList = document.getElementById("threat-list");
   const imuUnitToggle = document.getElementById("imu-unit-toggle");
   const operatorName = document.getElementById("operator-name");
   if (operatorName) {
@@ -44,7 +45,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let isGestureEnabled = false;
   let isGestureDispatchEnabled = true;
   let isWeaponsEnabled = false;
-  let isIndustrialEnabled = false;
   let telemetryInterval;
   let currentMode = "go2";
   let imuInDegrees = true;
@@ -103,6 +103,11 @@ document.addEventListener("DOMContentLoaded", () => {
   let classLookup = {};             // normalised class string → { id, type: "present"|"damaged" }
   let componentState = {};          // id → { status: "missing"|"present"|"damaged", conf }
   let unknownState = {};            // normalised label → { label, conf } — sticky unknowns
+
+  // Threat manifest + session state
+  let threatManifest = [];          // [{ id, label, yolo_classes }]
+  let threatClassLookup = {};       // normalised class string → { id }
+  let threatState = {};             // id → { status: "missing"|"present", conf }
 
   function normaliseClass(s) {
     return s.toLowerCase().replace(/_/g, " ").trim();
@@ -178,7 +183,33 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Load manifest immediately — cards render as "missing" on load
+  function buildThreatClassLookup() {
+    threatClassLookup = {};
+    threatManifest.forEach((t) => {
+      (t.yolo_classes || []).forEach((cls) => {
+        threatClassLookup[normaliseClass(cls)] = { id: t.id };
+      });
+    });
+  }
+
+  function initThreatState() {
+    threatState = {};
+    threatManifest.forEach((t) => {
+      threatState[t.id] = { status: "missing", conf: 0 };
+    });
+    renderThreatList();
+  }
+
+  function renderThreatList() {
+    if (!threatList) return;
+    threatList.innerHTML = "";
+    threatManifest.forEach((t) => {
+      const state = threatState[t.id] || { status: "missing", conf: 0 };
+      threatList.insertAdjacentHTML("beforeend", buildCard(t.label, state.status, state.conf));
+    });
+  }
+
+  // Load manifests immediately — cards render as "missing" on load
   fetch("/static/components.json")
     .then((r) => r.json())
     .then((data) => {
@@ -189,6 +220,18 @@ document.addEventListener("DOMContentLoaded", () => {
     .catch(() => {
       componentManifest = [];
       classLookup = {};
+    });
+
+  fetch("/static/threats.json")
+    .then((r) => r.json())
+    .then((data) => {
+      threatManifest = data.threats || [];
+      buildThreatClassLookup();
+      initThreatState();
+    })
+    .catch(() => {
+      threatManifest = [];
+      threatClassLookup = {};
     });
 
   const expandIconSvg = `
@@ -357,12 +400,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if (industrialBtn) {
-    industrialBtn.addEventListener("click", () => {
-      isIndustrialEnabled = !isIndustrialEnabled;
-      setToggleButtonState(industrialBtn, isIndustrialEnabled);
+  if (resetRolesBtn) {
+    resetRolesBtn.addEventListener("click", () => {
       if (dc && dc.readyState === "open") {
-        dc.send("toggle_industrial");
+        dc.send("reset_person_roles");
       }
     });
   }
@@ -417,9 +458,8 @@ document.addEventListener("DOMContentLoaded", () => {
           setToggleButtonState(weaponsBtn, isWeaponsEnabled);
         }
 
-        if (industrialBtn) {
-          industrialBtn.style.display = "flex";
-          setToggleButtonState(industrialBtn, isIndustrialEnabled);
+        if (resetRolesBtn) {
+          resetRolesBtn.style.display = "flex";
         }
 
         if (isYoloEnabled) {
@@ -432,10 +472,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (isWeaponsEnabled) {
           dc.send("toggle_weapons");
-        }
-
-        if (isIndustrialEnabled) {
-          dc.send("toggle_industrial");
         }
 
         startTelemetry();
@@ -465,7 +501,7 @@ document.addEventListener("DOMContentLoaded", () => {
               sysUptime.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }
             if (componentList) {
-              updateDetections(data.detections || []);
+              updateDetections([...(data.detections || []), ...(data.weapons_detections || [])]);
             }
             if (camFps && data.fps !== undefined) {
               camFps.textContent = data.fps.toFixed(1);
@@ -530,10 +566,6 @@ document.addEventListener("DOMContentLoaded", () => {
             if (data.weapons_enabled !== undefined) {
               isWeaponsEnabled = !!data.weapons_enabled;
               setToggleButtonState(weaponsBtn, isWeaponsEnabled);
-            }
-            if (data.industrial_enabled !== undefined) {
-              isIndustrialEnabled = !!data.industrial_enabled;
-              setToggleButtonState(industrialBtn, isIndustrialEnabled);
             }
             if (data.gesture_enabled !== undefined) {
               isGestureEnabled = !!data.gesture_enabled;
@@ -624,7 +656,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (gestureBtn) gestureBtn.style.display = "none";
     if (gestureDispatchBtn) gestureDispatchBtn.style.display = "none";
     if (weaponsBtn) weaponsBtn.style.display = "none";
-    if (industrialBtn) industrialBtn.style.display = "none";
+    if (resetRolesBtn) resetRolesBtn.style.display = "none";
 
     modeBadges.forEach((b) => b.classList.remove("locked"));
 
@@ -638,6 +670,7 @@ document.addEventListener("DOMContentLoaded", () => {
     stopTelemetry();
     if (pingInterval) clearInterval(pingInterval);
     initComponentState();
+    initThreatState();
   }
 
   // IMU unit toggle
@@ -764,24 +797,28 @@ function applyLatencyColor(el, ms) {
   }
 
   function updateDetections(detections) {
-    if (!componentList) return;
-
     detections.forEach((d) => {
       if (!d.class) return;
       const norm = normaliseClass(d.class);
-      const match = classLookup[norm];
+      const compMatch = classLookup[norm];
+      const threatMatch = threatClassLookup[norm];
 
-      if (match) {
-        const cur = componentState[match.id];
-        if (match.type === "damaged") {
-          // damaged always wins and stays
-          componentState[match.id] = { status: "damaged", conf: d.conf };
+      if (compMatch) {
+        const cur = componentState[compMatch.id];
+        if (compMatch.type === "damaged") {
+          componentState[compMatch.id] = { status: "damaged", conf: d.conf };
         } else if (cur && cur.status !== "damaged") {
-          // present upgrades from missing; never downgrades from damaged
-          componentState[match.id] = { status: "present", conf: d.conf };
+          componentState[compMatch.id] = { status: "present", conf: d.conf };
+        }
+      } else if (threatMatch) {
+        const cur = threatState[threatMatch.id];
+        if (cur && cur.status !== "present") {
+          threatState[threatMatch.id] = { status: "present", conf: d.conf };
+        } else if (cur && d.conf > cur.conf) {
+          threatState[threatMatch.id] = { status: "present", conf: d.conf };
         }
       } else {
-        // Not in manifest — sticky unknown "?" for the session
+        // Not in any manifest — sticky unknown for component list
         const readable = d.class.replace(/_/g, " ");
         const label = readable.charAt(0).toUpperCase() + readable.slice(1);
         if (!unknownState[norm] || d.conf > unknownState[norm].conf) {
@@ -791,5 +828,6 @@ function applyLatencyColor(el, ms) {
     });
 
     renderComponentList();
+    renderThreatList();
   }
 });

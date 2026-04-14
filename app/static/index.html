@@ -16,7 +16,7 @@
           <img src="/static/icons/logo.svg" class="logo" alt="Logo" onerror="this.src='/static/icons/shield-logo.svg'" />
         </div>
         <div class="brand-text">
-          <h1>QUADRUPED C2 | INDUSTRIAL INSPECTION</h1>
+          <h1>QUADRUPED C2</h1>
           <span class="status-indicator">SYSTEM STATUS: OPERATIONAL</span>
         </div>
       </div>
@@ -213,16 +213,14 @@
                   SECURITY DETECT
                 </button>
 
-                <button id="industrial-btn" class="secondary-btn" aria-label="Toggle Industrial Detection" title="Toggle Industrial Inspection Detection"
+                <button id="reset-roles-btn" class="secondary-btn" aria-label="Reset Person Roles" title="Reset Guard / Prisoner role assignments"
                   style="display: none;">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-                    <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-                    <line x1="12" y1="12" x2="12" y2="16" />
-                    <line x1="10" y1="14" x2="14" y2="14" />
+                    <polyline points="1 4 1 10 7 10" />
+                    <path d="M3.51 15a9 9 0 1 0 .49-4.95" />
                   </svg>
-                  INDUSTRIAL DETECT
+                  RESET ROLES
                 </button>
               </div>
             </div>
@@ -261,16 +259,12 @@
           <!-- Section 1 -->
           <div class="sidebar-section panel-solid">
             <div class="section-title">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
-                  stroke="#8b95a5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="#8b95a5" stroke-width="2" stroke-linecap="round"
-                  stroke-linejoin="round" />
-                <line x1="12" y1="22.08" x2="12" y2="12" stroke="#8b95a5" stroke-width="2" stroke-linecap="round"
-                  stroke-linejoin="round" />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b95a5" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
               </svg>
-              <h3>INDUSTRIAL COMPONENT DETECTION</h3>
+              <h3>ROOM SCAN</h3>
             </div>
 
             <div class="component-list" id="component-list">
@@ -281,32 +275,25 @@
           <!-- Section 2 -->
           <div class="sidebar-section panel-solid">
             <div class="section-title">
-              <img src="/static/icons/precision-measurements.svg" class="section-icon" alt="Precision"
-                onerror="this.style.display='none'" />
-              <h3>PRECISION MEASUREMENTS</h3>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b95a5" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <h3>THREAT DETECTION</h3>
             </div>
 
-            <ul class="data-list">
-              <li>
-                <span class="data-label">P1-P2 (Gap):</span>
-                <span class="data-val highlight-blue">12.45 mm</span>
-              </li>
-              <li>
-                <span class="data-label">Pipe Diameter:</span>
-                <span class="data-val highlight-blue">30.00 mm</span>
-              </li>
-              <li>
-                <span class="data-label">Bolt Height:</span>
-                <span class="data-val highlight-blue">15.22 mm</span>
-              </li>
-            </ul>
+            <div class="component-list" id="threat-list">
+              <!-- populated dynamically from threats.json -->
+            </div>
           </div>
 
         </div>
 
         <div class="sidebar-footer" style="margin-top: auto; padding-bottom: 1rem">
           <button id="btn-report" class="report-btn" style="width: 100%">
-            GENERATE QC REPORT
+            GENERATE REPORT
           </button>
         </div>
       </aside>

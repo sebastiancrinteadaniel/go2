@@ -14,6 +14,7 @@ from app.services.weapons_processor import WeaponsProcessor
 from app.services.industrial_processor import IndustrialProcessor
 from app.services.gesture_processor import GestureProcessor
 from app.services.gesture_dispatcher import GestureDispatcher
+from app.services.person_role_tracker import PersonRoleTracker
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,7 @@ class CameraSource:
         self.weapons_processor = WeaponsProcessor()
         self.industrial_processor = IndustrialProcessor()
         self.gesture_processor = GestureProcessor()
+        self.person_role_tracker = PersonRoleTracker()
         self.latest_detections = []
         self.latest_weapons_detections = []
         self.latest_industrial_detections = []
@@ -95,6 +97,7 @@ class CameraSource:
                 continue
             if self.yolo_processor.enabled:
                 annotated, detections = self.yolo_processor.process(frame)
+                annotated, detections = self.person_role_tracker.process(annotated, detections)
                 for det in detections:
                     cls = det.get("class", "")
                     if cls and (cls not in self.session_detections or det.get("conf", 0) > self.session_detections[cls].get("conf", 0)):
@@ -156,6 +159,7 @@ class Go2CameraSource:
         self.weapons_processor = WeaponsProcessor()
         self.industrial_processor = IndustrialProcessor()
         self.gesture_processor = GestureProcessor()
+        self.person_role_tracker = PersonRoleTracker()
         self.session_detections: dict = {}
         self.gesture_dispatcher = GestureDispatcher(
             enabled=True,
@@ -214,6 +218,7 @@ class Go2CameraSource:
                 continue
             if self.yolo_processor.enabled:
                 annotated, detections = self.yolo_processor.process(frame)
+                annotated, detections = self.person_role_tracker.process(annotated, detections)
                 for det in detections:
                     cls = det.get("class", "")
                     if cls and (cls not in self.session_detections or det.get("conf", 0) > self.session_detections[cls].get("conf", 0)):

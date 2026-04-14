@@ -3,7 +3,7 @@ import logging
 import numpy as np
 
 _IMGSZ = 640
-_CONF = 0.25
+_CONF = 0.40
 
 logger = logging.getLogger(__name__)
 

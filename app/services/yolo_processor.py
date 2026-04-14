@@ -1,11 +1,24 @@
+import colorsys
 import logging
 
+import cv2
 import numpy as np
 
 _IMGSZ = 640
 _CONF = 0.75
 
 logger = logging.getLogger(__name__)
+
+# Classes whose bounding boxes are drawn by a downstream processor (PersonRoleTracker).
+# We still include them in the detections list — just skip drawing them here.
+_SKIP_DRAW_CLASSES = {"person"}
+
+
+def _class_color(cls_id: int) -> tuple:
+    """Deterministic BGR colour from class ID (golden-ratio hue spacing)."""
+    hue = (cls_id * 0.618033988749895) % 1.0
+    r, g, b = colorsys.hsv_to_rgb(hue, 0.75, 0.9)
+    return (int(b * 255), int(g * 255), int(r * 255))
 
 _model = None
 try:
@@ -35,23 +48,37 @@ class YOLOProcessor:
 
         results = _model(frame, imgsz=_IMGSZ, conf=_CONF, verbose=False)
         result = results[0]
-        try:
-            annotated = result.plot()
-        except Exception:
-            annotated = frame
+
+        annotated = frame.copy()
         detections = []
+
         for box in result.boxes:
             cls_id = int(box.cls[0])
             conf = float(box.conf[0])
             cls_name = _model.names[cls_id]
-            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            x1, y1, x2, y2 = (int(v) for v in box.xyxy[0].tolist())
+
             detections.append(
-                {
-                    "class": cls_name,
-                    "conf": conf,
-                    "bbox": (int(x1), int(y1), int(x2), int(y2)),
-                }
+                {"class": cls_name, "conf": conf, "bbox": (x1, y1, x2, y2)}
             )
+
+            if cls_name in _SKIP_DRAW_CLASSES:
+                continue  # PersonRoleTracker owns the visual for these
+
+            color = _class_color(cls_id)
+            label = f"{cls_name} {conf:.2f}"
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
+            (tw, th), _ = cv2.getTextSize(
+                label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1
+            )
+            cv2.rectangle(
+                annotated, (x1, y1 - th - 6), (x1 + tw + 4, y1), color, -1
+            )
+            cv2.putText(
+                annotated, label, (x1 + 2, y1 - 3),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA,
+            )
+
         return annotated, detections
 
     def warmup(self) -> None:
