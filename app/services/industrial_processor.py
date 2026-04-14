@@ -3,14 +3,14 @@ import logging
 import numpy as np
 
 _IMGSZ = 640
-_CONF = 0.45
+_CONF = 0.01
 
 logger = logging.getLogger(__name__)
 
 try:
     from ultralytics import YOLO
 
-    _model = YOLO("app/models/industrial.pt")
+    _model = YOLO("app/models/industrial_draft_2.pt")
 except ImportError:
     _model = None
     logger.warning("'ultralytics' package not found. Industrial detection disabled.")
