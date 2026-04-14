@@ -3,16 +3,25 @@ import logging
 import numpy as np
 
 _IMGSZ = 640
-_CONF = 0.50
+_CONF = 0.25
 
 logger = logging.getLogger(__name__)
 
+_model = None
 try:
     from ultralytics import YOLO
 
-    _model = YOLO("app/models/weapons_best.pt")
+    try:
+        _model = YOLO("app/models/weapons_best.engine")
+        logger.info("Weapons: loaded engine model.")
+    except Exception as _e:
+        logger.warning(f"Weapons engine load failed ({_e}), falling back to .pt")
+        try:
+            _model = YOLO("app/models/weapons_best.pt")
+            logger.info("Weapons: loaded .pt model.")
+        except Exception as _e2:
+            logger.error(f"Weapons .pt load also failed ({_e2}). Weapons detection disabled.")
 except ImportError:
-    _model = None
     logger.warning("'ultralytics' package not found. Weapons detection disabled.")
 
 

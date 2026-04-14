@@ -3,16 +3,25 @@ import logging
 import numpy as np
 
 _IMGSZ = 640
-_CONF = 0.01
+_CONF = 0.15
 
 logger = logging.getLogger(__name__)
 
+_model = None
 try:
     from ultralytics import YOLO
 
-    _model = YOLO("app/models/industrial_draft_2.pt")
+    try:
+        _model = YOLO("app/models/industrial_draft_2.engine")
+        logger.info("Industrial: loaded engine model.")
+    except Exception as _e:
+        logger.warning(f"Industrial engine load failed ({_e}), falling back to .pt")
+        try:
+            _model = YOLO("app/models/industrial_draft_2.pt")
+            logger.info("Industrial: loaded .pt model.")
+        except Exception as _e2:
+            logger.error(f"Industrial .pt load also failed ({_e2}). Industrial detection disabled.")
 except ImportError:
-    _model = None
     logger.warning("'ultralytics' package not found. Industrial detection disabled.")
 
 
