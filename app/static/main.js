@@ -11,7 +11,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const gestureBtn = document.getElementById("gesture-btn");
   const gestureDispatchBtn = document.getElementById("gesture-dispatch-btn");
   const weaponsBtn = document.getElementById("weapons-btn");
-  const resetRolesBtn = document.getElementById("reset-roles-btn");
 
   const camName = document.getElementById("cam-name");
   const camFps = document.getElementById("cam-fps");
@@ -400,14 +399,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if (resetRolesBtn) {
-    resetRolesBtn.addEventListener("click", () => {
-      if (dc && dc.readyState === "open") {
-        dc.send("reset_person_roles");
-      }
-    });
-  }
-
   // Connect Button Handling
   connectBtn.addEventListener("click", () => {
     if (!isConnected) {
@@ -456,10 +447,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (weaponsBtn) {
           weaponsBtn.style.display = "flex";
           setToggleButtonState(weaponsBtn, isWeaponsEnabled);
-        }
-
-        if (resetRolesBtn) {
-          resetRolesBtn.style.display = "flex";
         }
 
         if (isYoloEnabled) {
@@ -666,7 +653,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (gestureBtn) gestureBtn.style.display = "none";
     if (gestureDispatchBtn) gestureDispatchBtn.style.display = "none";
     if (weaponsBtn) weaponsBtn.style.display = "none";
-    if (resetRolesBtn) resetRolesBtn.style.display = "none";
 
     modeBadges.forEach((b) => b.classList.remove("locked"));
 
