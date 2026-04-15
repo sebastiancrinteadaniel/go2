@@ -8,10 +8,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const cameraErrorOverlay = document.getElementById("camera-error-overlay");
   const videoFeed = document.getElementById("live-feed");
   const yoloBtn = document.getElementById("yolo-btn");
+  const industrialBtn = document.getElementById("industrial-btn");
   const gestureBtn = document.getElementById("gesture-btn");
   const gestureDispatchBtn = document.getElementById("gesture-dispatch-btn");
-  const weaponsBtn = document.getElementById("weapons-btn");
-  const industrialBtn = document.getElementById("industrial-btn");
 
   const camName = document.getElementById("cam-name");
   const camFps = document.getElementById("cam-fps");
@@ -41,10 +40,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // State
   let isConnected = false;
   let isYoloEnabled = false;
+  let isIndustrialEnabled = false;
   let isGestureEnabled = false;
   let isGestureDispatchEnabled = true;
-  let isWeaponsEnabled = false;
-  let isIndustrialEnabled = false;
   let telemetryInterval;
   let currentMode = "go2";
   let imuInDegrees = true;
@@ -228,7 +226,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function getCamNameForMode(mode) {
     if (mode === "sensor_fusion") {
-      return "SENSOR_FUSION_CAM";
+      return "OAK-D_S2";
     }
     if (mode === "go2") {
       return "GO2_CAMERA";
@@ -243,7 +241,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (gestureDispatchBtn && isConnected) {
-      gestureDispatchBtn.style.display = mode === "go2" ? "flex" : "none";
+      const supportsDispatch = mode === "go2" || mode === "sensor_fusion";
+      gestureDispatchBtn.style.display = supportsDispatch ? "flex" : "none";
     }
   }
 
@@ -327,6 +326,16 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  if (industrialBtn) {
+    industrialBtn.addEventListener("click", () => {
+      isIndustrialEnabled = !isIndustrialEnabled;
+      setToggleButtonState(industrialBtn, isIndustrialEnabled);
+      if (dc && dc.readyState === "open") {
+        dc.send("toggle_industrial");
+      }
+    });
+  }
+
   if (gestureBtn) {
     gestureBtn.addEventListener("click", () => {
       isGestureEnabled = !isGestureEnabled;
@@ -343,26 +352,6 @@ document.addEventListener("DOMContentLoaded", () => {
       setToggleButtonState(gestureDispatchBtn, isGestureDispatchEnabled);
       if (dc && dc.readyState === "open") {
         dc.send("toggle_gesture_dispatch");
-      }
-    });
-  }
-
-  if (weaponsBtn) {
-    weaponsBtn.addEventListener("click", () => {
-      isWeaponsEnabled = !isWeaponsEnabled;
-      setToggleButtonState(weaponsBtn, isWeaponsEnabled);
-      if (dc && dc.readyState === "open") {
-        dc.send("toggle_weapons");
-      }
-    });
-  }
-
-  if (industrialBtn) {
-    industrialBtn.addEventListener("click", () => {
-      isIndustrialEnabled = !isIndustrialEnabled;
-      setToggleButtonState(industrialBtn, isIndustrialEnabled);
-      if (dc && dc.readyState === "open") {
-        dc.send("toggle_industrial");
       }
     });
   }
@@ -398,13 +387,18 @@ document.addEventListener("DOMContentLoaded", () => {
           setToggleButtonState(yoloBtn, isYoloEnabled);
         }
 
+        if (industrialBtn) {
+          industrialBtn.style.display = "flex";
+          setToggleButtonState(industrialBtn, isIndustrialEnabled);
+        }
+
         if (gestureBtn) {
           gestureBtn.style.display = "flex";
           setToggleButtonState(gestureBtn, isGestureEnabled);
         }
 
         if (gestureDispatchBtn) {
-          if (currentMode === "go2") {
+          if (currentMode === "go2" || currentMode === "sensor_fusion") {
             gestureDispatchBtn.style.display = "flex";
             setToggleButtonState(gestureDispatchBtn, isGestureDispatchEnabled);
           } else {
@@ -412,30 +406,16 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         }
 
-        if (weaponsBtn) {
-          weaponsBtn.style.display = "flex";
-          setToggleButtonState(weaponsBtn, isWeaponsEnabled);
-        }
-
-        if (industrialBtn) {
-          industrialBtn.style.display = "flex";
-          setToggleButtonState(industrialBtn, isIndustrialEnabled);
-        }
-
         if (isYoloEnabled) {
           dc.send("toggle_yolo");
         }
 
-        if (isGestureEnabled) {
-          dc.send("toggle_gesture");
-        }
-
-        if (isWeaponsEnabled) {
-          dc.send("toggle_weapons");
-        }
-
         if (isIndustrialEnabled) {
           dc.send("toggle_industrial");
+        }
+
+        if (isGestureEnabled) {
+          dc.send("toggle_gesture");
         }
 
         startTelemetry();
@@ -465,7 +445,11 @@ document.addEventListener("DOMContentLoaded", () => {
               sysUptime.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }
             if (componentList) {
-              updateDetections(data.detections || []);
+              const merged = [
+                ...(data.detections || []),
+                ...(data.industrial_detections || []),
+              ];
+              updateDetections(merged);
             }
             if (camFps && data.fps !== undefined) {
               camFps.textContent = data.fps.toFixed(1);
@@ -527,10 +511,6 @@ document.addEventListener("DOMContentLoaded", () => {
               isYoloEnabled = !!data.yolo_enabled;
               setToggleButtonState(yoloBtn, isYoloEnabled);
             }
-            if (data.weapons_enabled !== undefined) {
-              isWeaponsEnabled = !!data.weapons_enabled;
-              setToggleButtonState(weaponsBtn, isWeaponsEnabled);
-            }
             if (data.industrial_enabled !== undefined) {
               isIndustrialEnabled = !!data.industrial_enabled;
               setToggleButtonState(industrialBtn, isIndustrialEnabled);
@@ -539,7 +519,10 @@ document.addEventListener("DOMContentLoaded", () => {
               isGestureEnabled = !!data.gesture_enabled;
               setToggleButtonState(gestureBtn, isGestureEnabled);
             }
-            if (currentMode === "go2" && data.gesture_dispatch_enabled !== undefined) {
+            if (
+              (currentMode === "go2" || currentMode === "sensor_fusion") &&
+              data.gesture_dispatch_enabled !== undefined
+            ) {
               isGestureDispatchEnabled = !!data.gesture_dispatch_enabled;
               setToggleButtonState(gestureDispatchBtn, isGestureDispatchEnabled);
             }
@@ -621,10 +604,9 @@ document.addEventListener("DOMContentLoaded", () => {
     statusText.textContent = "LIVE STREAM DISCONNECTED";
 
     if (yoloBtn) yoloBtn.style.display = "none";
+    if (industrialBtn) industrialBtn.style.display = "none";
     if (gestureBtn) gestureBtn.style.display = "none";
     if (gestureDispatchBtn) gestureDispatchBtn.style.display = "none";
-    if (weaponsBtn) weaponsBtn.style.display = "none";
-    if (industrialBtn) industrialBtn.style.display = "none";
 
     modeBadges.forEach((b) => b.classList.remove("locked"));
 

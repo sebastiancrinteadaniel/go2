@@ -1,16 +1,16 @@
 {
   "components": [
     {
-      "id": "main_pipe_joint",
-      "label": "Main Pipe Joint",
-      "yolo_classes": ["pipe_joint", "pipe joint", "main_pipe_joint", "main pipe joint"],
-      "damaged_classes": ["pipe_joint_damaged", "damaged_pipe_joint", "main_pipe_joint_damaged"]
+      "id": "screw",
+      "label": "Screw",
+      "yolo_classes": ["screw", "m8_screw", "m8 screw", "screw_m8", "screw m8"],
+      "damaged_classes": ["screw_damaged", "damaged_screw", "m8_screw_damaged"]
     },
     {
-      "id": "m8_screw_inner",
-      "label": "M8 Screw (Inner)",
-      "yolo_classes": ["m8_screw", "m8 screw", "screw_m8", "screw m8"],
-      "damaged_classes": ["m8_screw_damaged", "damaged_screw", "screw_damaged"]
+      "id": "clamp",
+      "label": "Clamp",
+      "yolo_classes": ["clamp", "pipe_clamp", "pipe clamp", "hose_clamp"],
+      "damaged_classes": ["clamp_damaged", "damaged_clamp"]
     },
     {
       "id": "support_bracket",
@@ -25,16 +25,10 @@
       "damaged_classes": ["valve_damaged", "damaged_valve", "pressure_valve_damaged"]
     },
     {
-      "id": "hex_bolt_b1",
-      "label": "Hex Bolt B1",
-      "yolo_classes": ["hex_bolt", "hex bolt", "bolt_b1", "bolt b1", "hex_bolt_b1"],
+      "id": "hex_bolt",
+      "label": "Hex Bolt",
+      "yolo_classes": ["hex_bolt", "hex bolt", "bolt", "hex_bolt_b1"],
       "damaged_classes": ["bolt_damaged", "damaged_bolt", "hex_bolt_damaged"]
-    },
-        {
-      "id": "person_p1",
-      "label": "Person P1",
-      "yolo_classes": ["person", "human", "man", "woman"],
-      "damaged_classes": ["person_damaged", "damaged_person"]
     }
   ]
 }

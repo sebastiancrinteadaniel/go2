@@ -14,7 +14,7 @@ from datetime import datetime
 from aiortc import RTCPeerConnection, RTCSessionDescription
 
 from app.core.config import settings
-from app.services.video import CameraSource, Go2CameraSource, ViewerTrack
+from app.services.video import CameraSource, Go2CameraSource, DepthCameraSource, ViewerTrack
 from app.services.telemetry import telemetry
 from app.services.report_generator import ReportData, build_pdf, next_report_id
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_active_source: CameraSource | Go2CameraSource | None = None
+_active_source: CameraSource | Go2CameraSource | DepthCameraSource | None = None
 _active_pcs: set[RTCPeerConnection] = set()
 _active_mode: str = "hd_view"
 
@@ -33,7 +33,8 @@ async def _close_pc(pc: RTCPeerConnection) -> None:
     _active_pcs.discard(pc)
     await pc.close()
     if not _active_pcs and _active_source is not None:
-        _active_source.stop()
+        # Run in a thread so capture-thread joins don't block the event loop.
+        await asyncio.to_thread(_active_source.stop)
         _active_source = None
 
 
@@ -44,7 +45,7 @@ async def close_all() -> None:
         await pc.close()
     _active_pcs.clear()
     if _active_source is not None:
-        _active_source.stop()
+        await asyncio.to_thread(_active_source.stop)
         _active_source = None
 
 
@@ -89,6 +90,8 @@ async def offer(request: Request):
     if _active_source is None:
         if mode == "go2":
             _active_source = Go2CameraSource()
+        elif mode == "sensor_fusion":
+            _active_source = DepthCameraSource()
         else:
             _active_source = CameraSource()
         telemetry.init()
@@ -117,7 +120,6 @@ async def offer(request: Request):
                     uptime_seconds = int(time.time() - psutil.boot_time())
                     fps = getattr(source, "current_fps", 0.0)
                     detections = getattr(source, "latest_detections", [])
-                    weapons_detections = getattr(source, "latest_weapons_detections", [])
                     industrial_detections = getattr(source, "latest_industrial_detections", [])
                     gestures = getattr(source, "latest_gestures", [])
                     motor_temps = telemetry.motor_temps
@@ -142,17 +144,16 @@ async def offer(request: Request):
                         "type": "stats",
                         "initializing": getattr(source, "_initializing", False),
                         "camera_connected": getattr(source, "connected", True),
+                        "camera_error": getattr(source, "camera_error", ""),
                         "cpu_percent": cpu_percent,
                         "ram_percent": ram.percent,
                         "uptime": uptime_seconds,
                         "detections": detections,
-                        "weapons_detections": weapons_detections,
                         "industrial_detections": industrial_detections,
                         "gestures": gestures,
                         "fps": fps,
                         "dispatched_gesture": dispatched_gesture,
                         "yolo_enabled": source.yolo_processor.enabled,
-                        "weapons_enabled": source.weapons_processor.enabled,
                         "industrial_enabled": source.industrial_processor.enabled,
                         "gesture_enabled": source.gesture_processor.enabled,
                         "gesture_dispatch_enabled": getattr(_dispatcher, "enabled", False),
@@ -182,8 +183,6 @@ async def offer(request: Request):
                 channel.send("pong")
             elif message == "toggle_yolo":
                 source.yolo_processor.enabled = not source.yolo_processor.enabled
-            elif message == "toggle_weapons":
-                source.weapons_processor.enabled = not source.weapons_processor.enabled
             elif message == "toggle_industrial":
                 source.industrial_processor.enabled = not source.industrial_processor.enabled
             elif message == "toggle_gesture":
@@ -238,7 +237,7 @@ async def generate_report(request: Request):
         except Exception:
             pass
 
-    camera_source_map = {"go2": "Go2 Camera"}
+    camera_source_map = {"go2": "Go2 Camera", "sensor_fusion": "OAK-D S2 Sensor Fusion"}
     robot_connected = telemetry.connected and (time.time() - telemetry.last_update) < 2.0
 
     data = ReportData(

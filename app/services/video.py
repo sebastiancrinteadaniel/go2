@@ -10,12 +10,37 @@ from av import VideoFrame
 from app.core.config import settings
 
 from app.services.yolo_processor import YOLOProcessor
-from app.services.weapons_processor import WeaponsProcessor
 from app.services.industrial_processor import IndustrialProcessor
 from app.services.gesture_processor import GestureProcessor
 from app.services.gesture_dispatcher import GestureDispatcher
 
 logger = logging.getLogger(__name__)
+
+
+def _overlay_depth_pip(frame: np.ndarray, depth_raw: np.ndarray) -> np.ndarray:
+    """Overlay a colourised depth minimap in the bottom-right corner of *frame*.
+
+    Depth values are clipped to 0–5 000 mm and mapped with COLORMAP_TURBO
+    (blue ≈ close, red ≈ far).
+    """
+    h, w = frame.shape[:2]
+    pip_w, pip_h = w // 4, h // 4
+
+    clipped = np.clip(depth_raw, 0, 5000).astype(np.float32)
+    normalized = (clipped / 5000 * 255).astype(np.uint8)
+    depth_color = cv2.applyColorMap(normalized, cv2.COLORMAP_TURBO)
+    depth_resized = cv2.resize(depth_color, (pip_w, pip_h))
+
+    # Thin border + label
+    cv2.rectangle(depth_resized, (0, 0), (pip_w - 1, pip_h - 1), (180, 180, 180), 1)
+    cv2.putText(
+        depth_resized, "DEPTH (0-5m)", (4, pip_h - 6),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.35, (255, 255, 255), 1, cv2.LINE_AA,
+    )
+
+    x_off, y_off = w - pip_w - 4, h - pip_h - 4
+    frame[y_off : y_off + pip_h, x_off : x_off + pip_w] = depth_resized
+    return frame
 
 
 class CvFpsCalc:
@@ -54,11 +79,9 @@ class CameraSource:
         self.cap.set(cv2.CAP_PROP_FPS, settings.CAMERA_FPS)
 
         self.yolo_processor = YOLOProcessor()
-        self.weapons_processor = WeaponsProcessor()
         self.industrial_processor = IndustrialProcessor()
         self.gesture_processor = GestureProcessor()
         self.latest_detections = []
-        self.latest_weapons_detections = []
         self.latest_industrial_detections = []
         self.session_detections: dict = {}
         self.latest_gestures = []
@@ -85,7 +108,6 @@ class CameraSource:
 
     def _inference_loop(self) -> None:
         self.yolo_processor.warmup()
-        self.weapons_processor.warmup()
         self.industrial_processor.warmup()
         self.gesture_processor.warmup()
         while not self._stop_event.is_set():
@@ -101,10 +123,6 @@ class CameraSource:
                         self.session_detections[cls] = det
             else:
                 annotated, detections = frame, []
-            if self.weapons_processor.enabled:
-                annotated, weapons_detections = self.weapons_processor.process(annotated)
-            else:
-                weapons_detections = []
             if self.industrial_processor.enabled:
                 annotated, industrial_detections = self.industrial_processor.process(annotated)
             else:
@@ -116,7 +134,6 @@ class CameraSource:
 
             self._last_frame = annotated
             self.latest_detections = detections
-            self.latest_weapons_detections = weapons_detections
             self.latest_industrial_detections = industrial_detections
             self.latest_gestures = gestures
 
@@ -153,7 +170,6 @@ class Go2CameraSource:
             logger.error(f"Error initializing Go2 VideoClient: {e}")
 
         self.yolo_processor = YOLOProcessor()
-        self.weapons_processor = WeaponsProcessor()
         self.industrial_processor = IndustrialProcessor()
         self.gesture_processor = GestureProcessor()
         self.session_detections: dict = {}
@@ -165,7 +181,6 @@ class Go2CameraSource:
             min_stable_frames=settings.GESTURE_DISPATCH_MIN_STABLE_FRAMES,
         )
         self.latest_detections = []
-        self.latest_weapons_detections = []
         self.latest_industrial_detections = []
         self.latest_gestures = []
         self.fps_calc = CvFpsCalc(buffer_len=10)
@@ -204,7 +219,6 @@ class Go2CameraSource:
 
     def _inference_loop(self) -> None:
         self.yolo_processor.warmup()
-        self.weapons_processor.warmup()
         self.industrial_processor.warmup()
         self.gesture_processor.warmup()
         while not self._stop_event.is_set():
@@ -220,10 +234,6 @@ class Go2CameraSource:
                         self.session_detections[cls] = det
             else:
                 annotated, detections = frame, []
-            if self.weapons_processor.enabled:
-                annotated, weapons_detections = self.weapons_processor.process(annotated)
-            else:
-                weapons_detections = []
             if self.industrial_processor.enabled:
                 annotated, industrial_detections = self.industrial_processor.process(annotated)
             else:
@@ -237,7 +247,6 @@ class Go2CameraSource:
 
             self._last_frame = annotated
             self.latest_detections = detections
-            self.latest_weapons_detections = weapons_detections
             self.latest_industrial_detections = industrial_detections
             self.latest_gestures = gestures
             self._initializing = False
@@ -253,10 +262,210 @@ class Go2CameraSource:
         self.client = None
 
 
+class DepthCameraSource:
+    """OAK-D S2 RGB + depth camera with sensor fusion composite output.
+
+    Streams the full RGB feed (with AI inference) and composites a colourised
+    depth minimap (picture-in-picture) in the bottom-right corner.
+    """
+
+    def __init__(self):
+        self.camera_error: str = ""
+        try:
+            import depthai as dai
+
+            self._dai = dai
+            self._pipeline = self._build_pipeline(dai)
+            self.connected = True
+            logger.info("DepthAI pipeline ready.")
+        except ImportError:
+            self._dai = None
+            self._pipeline = None
+            self.connected = False
+            self.camera_error = "depthai not installed"
+            logger.warning("'depthai' not installed. Sensor fusion mode unavailable.")
+        except Exception as e:
+            self._dai = None
+            self._pipeline = None
+            self.connected = False
+            self.camera_error = str(e)
+            logger.error(f"Error building DepthAI pipeline: {e}")
+
+        self.yolo_processor = YOLOProcessor()
+        self.industrial_processor = IndustrialProcessor()
+        self.gesture_processor = GestureProcessor()
+        self.session_detections: dict = {}
+        # Gesture dispatch works whenever the Unitree SDK is importable —
+        # ChannelFactoryInitialize is already called at app startup in main.py.
+        self.gesture_dispatcher = GestureDispatcher(
+            enabled=True,
+            cooldown_seconds=settings.GESTURE_DISPATCH_COOLDOWN,
+            global_cooldown_seconds=settings.GESTURE_DISPATCH_GLOBAL_COOLDOWN,
+            min_confidence=settings.GESTURE_DISPATCH_MIN_CONFIDENCE,
+            min_stable_frames=settings.GESTURE_DISPATCH_MIN_STABLE_FRAMES,
+        )
+        self.latest_detections = []
+        self.latest_industrial_detections = []
+        self.latest_gestures = []
+        self.fps_calc = CvFpsCalc(buffer_len=10)
+        self.current_fps = 0.0
+
+        self._offline_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        self._connecting_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        self._initializing = True
+        self._stop_event = threading.Event()
+        self._frame_queue: queue.Queue = queue.Queue(maxsize=2)
+        self._last_frame: np.ndarray = (
+            self._connecting_frame.copy() if self.connected else self._offline_frame.copy()
+        )
+
+        self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
+        self._capture_thread.start()
+        self._inference_thread = threading.Thread(target=self._inference_loop, daemon=True)
+        self._inference_thread.start()
+
+    @staticmethod
+    def _build_pipeline(dai):
+        pipeline = dai.Pipeline()
+
+        cam_rgb = pipeline.create(dai.node.ColorCamera)
+        cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
+        cam_rgb.setInterleaved(False)
+        cam_rgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
+        cam_rgb.setFps(30)
+
+        cam_left = pipeline.create(dai.node.MonoCamera)
+        cam_left.setBoardSocket(dai.CameraBoardSocket.CAM_B)
+        cam_left.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
+
+        cam_right = pipeline.create(dai.node.MonoCamera)
+        cam_right.setBoardSocket(dai.CameraBoardSocket.CAM_C)
+        cam_right.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
+
+        stereo = pipeline.create(dai.node.StereoDepth)
+        stereo.setLeftRightCheck(True)
+        stereo.setSubpixel(False)
+        cam_left.out.link(stereo.left)
+        cam_right.out.link(stereo.right)
+
+        xout_rgb = pipeline.create(dai.node.XLinkOut)
+        xout_rgb.setStreamName("rgb")
+        xout_depth = pipeline.create(dai.node.XLinkOut)
+        xout_depth.setStreamName("depth")
+
+        cam_rgb.video.link(xout_rgb.input)
+        stereo.depth.link(xout_depth.input)
+
+        return pipeline
+
+    def _capture_loop(self) -> None:
+        if not self.connected or self._pipeline is None:
+            return
+
+        # USB cleanup from a previous session can lag a few seconds; retry the
+        # device open instead of failing hard on the first "device busy" error.
+        max_attempts = 5
+        last_error: Exception | None = None
+        for attempt in range(1, max_attempts + 1):
+            if self._stop_event.is_set():
+                return
+            try:
+                with self._dai.Device(self._pipeline) as device:
+                    logger.info(
+                        f"OAK-D connected: {device.getDeviceName()}  USB: {device.getUsbSpeed().name}"
+                    )
+                    rgb_queue = device.getOutputQueue("rgb", maxSize=4, blocking=False)
+                    depth_queue = device.getOutputQueue("depth", maxSize=4, blocking=False)
+                    latest_depth = None
+                    while not self._stop_event.is_set():
+                        rgb_msg = rgb_queue.tryGet()
+                        depth_msg = depth_queue.tryGet()
+                        if depth_msg is not None:
+                            latest_depth = depth_msg.getFrame()
+                        if rgb_msg is not None and latest_depth is not None:
+                            # Camera is physically mounted upside down — rotate 180°
+                            rgb_frame = cv2.flip(rgb_msg.getCvFrame(), -1)
+                            depth_frame = cv2.flip(latest_depth.copy(), -1)
+                            _safe_put(self._frame_queue, (rgb_frame, depth_frame))
+                        else:
+                            self._stop_event.wait(0.002)
+                return  # clean exit via stop_event
+            except Exception as e:
+                last_error = e
+                logger.warning(
+                    f"OAK-D open attempt {attempt}/{max_attempts} failed: {e}"
+                )
+                if self._stop_event.wait(1.5):
+                    return
+
+        logger.error(f"OAK-D capture error after {max_attempts} attempts: {last_error}")
+        self.connected = False
+        self.camera_error = str(last_error) if last_error else "unknown"
+
+    def _inference_loop(self) -> None:
+        self.yolo_processor.warmup()
+        self.industrial_processor.warmup()
+        self.gesture_processor.warmup()
+        while not self._stop_event.is_set():
+            try:
+                item = self._frame_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            frame, depth_raw = item
+
+            if self.yolo_processor.enabled:
+                annotated, detections = self.yolo_processor.process(frame)
+                for det in detections:
+                    cls = det.get("class", "")
+                    if cls and (
+                        cls not in self.session_detections
+                        or det.get("conf", 0) > self.session_detections[cls].get("conf", 0)
+                    ):
+                        self.session_detections[cls] = det
+            else:
+                annotated, detections = frame, []
+
+            if self.industrial_processor.enabled:
+                annotated, industrial_detections = self.industrial_processor.process(annotated)
+            else:
+                industrial_detections = []
+
+            if self.gesture_processor.enabled:
+                annotated, gestures = self.gesture_processor.process(annotated)
+            else:
+                gestures = []
+
+            self.gesture_dispatcher.process(gestures)
+
+            # Composite depth PiP onto the annotated RGB frame
+            annotated = _overlay_depth_pip(annotated, depth_raw)
+
+            self._last_frame = annotated
+            self.latest_detections = detections
+            self.latest_industrial_detections = industrial_detections
+            self.latest_gestures = gestures
+            self._initializing = False
+
+    def get_latest_frame(self) -> np.ndarray:
+        if self._initializing:
+            return self._connecting_frame if self.connected else self._offline_frame
+        return self._last_frame
+
+    def stop(self):
+        self._stop_event.set()
+        self.gesture_processor.stop()
+        # Wait for the capture thread to exit its `with dai.Device(...)` block
+        # so the OAK-D USB handle is fully released before a new source opens.
+        if self._capture_thread.is_alive():
+            self._capture_thread.join(timeout=3.0)
+        if self._inference_thread.is_alive():
+            self._inference_thread.join(timeout=1.0)
+
+
 class ViewerTrack(VideoStreamTrack):
     """One WebRTC video track per viewer. Reads frames from a shared camera source."""
 
-    def __init__(self, source: "CameraSource | Go2CameraSource"):
+    def __init__(self, source: "CameraSource | Go2CameraSource | DepthCameraSource"):
         super().__init__()
         self._source = source
 
