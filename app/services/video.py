@@ -379,6 +379,30 @@ class DepthCameraSource:
         self.fps_calc = CvFpsCalc(buffer_len=10)
         self.current_fps = 0.0
 
+        # Gesture dispatch is only available when the Unitree SDK is present.
+        # The OAK-D feed itself works fine without it.
+        self.gesture_dispatcher: GestureDispatcher | None = None
+        try:
+            from unitree_sdk2py.core.channel import ChannelFactoryInitialize
+            import psutil
+
+            is_jetson = os.path.exists("/etc/nv_tegra_release")
+            has_eth0 = "eth0" in psutil.net_if_addrs()
+            iface = "eth0" if (is_jetson and has_eth0) else "lo"
+            ChannelFactoryInitialize(0, iface)
+            self.gesture_dispatcher = GestureDispatcher(
+                enabled=True,
+                cooldown_seconds=settings.GESTURE_DISPATCH_COOLDOWN,
+                global_cooldown_seconds=settings.GESTURE_DISPATCH_GLOBAL_COOLDOWN,
+                min_confidence=settings.GESTURE_DISPATCH_MIN_CONFIDENCE,
+                min_stable_frames=settings.GESTURE_DISPATCH_MIN_STABLE_FRAMES,
+            )
+            logger.info(f"Unitree SDK active on {iface} — gesture dispatch enabled for sensor fusion.")
+        except ImportError:
+            logger.info("unitree_sdk2py not installed — sensor fusion running without gesture dispatch.")
+        except Exception as e:
+            logger.warning(f"Could not initialize Unitree SDK for sensor fusion: {e}")
+
         self._offline_frame = np.zeros((480, 640, 3), dtype=np.uint8)
         self._connecting_frame = np.zeros((480, 640, 3), dtype=np.uint8)
         self._initializing = True
@@ -430,30 +454,47 @@ class DepthCameraSource:
     def _capture_loop(self) -> None:
         if not self.connected or self._pipeline is None:
             return
-        try:
-            with self._dai.Device(self._pipeline) as device:
-                logger.info(
-                    f"OAK-D connected: {device.getDeviceName()}  USB: {device.getUsbSpeed().name}"
+
+        # USB cleanup from a previous session can lag a few seconds; retry the
+        # device open instead of failing hard on the first "device busy" error.
+        max_attempts = 5
+        last_error: Exception | None = None
+        for attempt in range(1, max_attempts + 1):
+            if self._stop_event.is_set():
+                return
+            try:
+                with self._dai.Device(self._pipeline) as device:
+                    logger.info(
+                        f"OAK-D connected: {device.getDeviceName()}  USB: {device.getUsbSpeed().name}"
+                    )
+                    rgb_queue = device.getOutputQueue("rgb", maxSize=4, blocking=False)
+                    depth_queue = device.getOutputQueue("depth", maxSize=4, blocking=False)
+                    latest_depth = None
+                    while not self._stop_event.is_set():
+                        rgb_msg = rgb_queue.tryGet()
+                        depth_msg = depth_queue.tryGet()
+                        if depth_msg is not None:
+                            latest_depth = depth_msg.getFrame()
+                        if rgb_msg is not None and latest_depth is not None:
+                            # Camera is physically mounted upside down — rotate 180°
+                            rgb_frame = cv2.flip(rgb_msg.getCvFrame(), -1)
+                            depth_frame = cv2.flip(latest_depth.copy(), -1)
+                            _safe_put(self._frame_queue, (rgb_frame, depth_frame))
+                        else:
+                            self._stop_event.wait(0.002)
+                return  # clean exit via stop_event
+            except Exception as e:
+                last_error = e
+                logger.warning(
+                    f"OAK-D open attempt {attempt}/{max_attempts} failed: {e}"
                 )
-                rgb_queue = device.getOutputQueue("rgb", maxSize=4, blocking=False)
-                depth_queue = device.getOutputQueue("depth", maxSize=4, blocking=False)
-                latest_depth = None
-                while not self._stop_event.is_set():
-                    rgb_msg = rgb_queue.tryGet()
-                    depth_msg = depth_queue.tryGet()
-                    if depth_msg is not None:
-                        latest_depth = depth_msg.getFrame()
-                    if rgb_msg is not None and latest_depth is not None:
-                        # Camera is physically mounted upside down — rotate 180°
-                        rgb_frame = cv2.flip(rgb_msg.getCvFrame(), -1)
-                        depth_frame = cv2.flip(latest_depth.copy(), -1)
-                        _safe_put(self._frame_queue, (rgb_frame, depth_frame))
-                    else:
-                        self._stop_event.wait(0.002)
-        except Exception as e:
-            logger.error(f"OAK-D capture error: {e}")
-            self.connected = False
-            self.camera_error = str(e)
+                # Wait before retrying — also abort early if stop is requested.
+                if self._stop_event.wait(1.5):
+                    return
+
+        logger.error(f"OAK-D capture error after {max_attempts} attempts: {last_error}")
+        self.connected = False
+        self.camera_error = str(last_error) if last_error else "unknown"
 
     def _inference_loop(self) -> None:
         self.yolo_processor.warmup()
@@ -499,6 +540,9 @@ class DepthCameraSource:
             else:
                 gestures = []
 
+            if self.gesture_dispatcher is not None:
+                self.gesture_dispatcher.process(gestures)
+
             # Composite depth PiP onto the annotated RGB frame
             annotated = _overlay_depth_pip(annotated, depth_raw)
 
@@ -517,6 +561,13 @@ class DepthCameraSource:
     def stop(self):
         self._stop_event.set()
         self.gesture_processor.stop()
+        # Wait for the capture thread to exit its `with dai.Device(...)` block
+        # so the OAK-D USB handle is fully released before a new source opens.
+        # Without this, reopen fails the first time and only works on the 2nd try.
+        if self._capture_thread.is_alive():
+            self._capture_thread.join(timeout=3.0)
+        if self._inference_thread.is_alive():
+            self._inference_thread.join(timeout=1.0)
 
 
 class ViewerTrack(VideoStreamTrack):

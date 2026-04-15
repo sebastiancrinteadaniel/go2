@@ -285,7 +285,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (gestureDispatchBtn && isConnected) {
-      gestureDispatchBtn.style.display = mode === "go2" ? "flex" : "none";
+      const supportsDispatch = mode === "go2" || mode === "sensor_fusion";
+      gestureDispatchBtn.style.display = supportsDispatch ? "flex" : "none";
     }
   }
 
@@ -436,7 +437,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (gestureDispatchBtn) {
-          if (currentMode === "go2") {
+          if (currentMode === "go2" || currentMode === "sensor_fusion") {
             gestureDispatchBtn.style.display = "flex";
             setToggleButtonState(gestureDispatchBtn, isGestureDispatchEnabled);
           } else {
@@ -568,9 +569,16 @@ document.addEventListener("DOMContentLoaded", () => {
               isGestureEnabled = !!data.gesture_enabled;
               setToggleButtonState(gestureBtn, isGestureEnabled);
             }
-            if (currentMode === "go2" && data.gesture_dispatch_enabled !== undefined) {
+            if (
+              (currentMode === "go2" || currentMode === "sensor_fusion") &&
+              data.gesture_dispatch_enabled !== undefined
+            ) {
               isGestureDispatchEnabled = !!data.gesture_dispatch_enabled;
               setToggleButtonState(gestureDispatchBtn, isGestureDispatchEnabled);
+            }
+            // Hide the dispatch button if the backend says SDK isn't available.
+            if (gestureDispatchBtn && data.gesture_dispatch_available === false) {
+              gestureDispatchBtn.style.display = "none";
             }
             if (Array.isArray(data.imu_rpy) && data.imu_rpy.length === 3) {
               lastImuRpy = data.imu_rpy;

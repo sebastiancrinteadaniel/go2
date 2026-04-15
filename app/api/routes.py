@@ -33,7 +33,8 @@ async def _close_pc(pc: RTCPeerConnection) -> None:
     _active_pcs.discard(pc)
     await pc.close()
     if not _active_pcs and _active_source is not None:
-        _active_source.stop()
+        # Run in a thread so capture-thread joins don't block the event loop.
+        await asyncio.to_thread(_active_source.stop)
         _active_source = None
 
 
@@ -44,7 +45,7 @@ async def close_all() -> None:
         await pc.close()
     _active_pcs.clear()
     if _active_source is not None:
-        _active_source.stop()
+        await asyncio.to_thread(_active_source.stop)
         _active_source = None
 
 
@@ -159,6 +160,7 @@ async def offer(request: Request):
                         "industrial_enabled": source.industrial_processor.enabled,
                         "gesture_enabled": source.gesture_processor.enabled,
                         "gesture_dispatch_enabled": getattr(_dispatcher, "enabled", False),
+                        "gesture_dispatch_available": _dispatcher is not None,
                         "battery": telemetry.battery_soc,
                         "connected": telemetry.connected and ((time.time() - telemetry.last_update) < 2.0),
                         "motor_temps": motor_temps,
