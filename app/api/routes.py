@@ -34,7 +34,9 @@ async def _close_pc(pc: RTCPeerConnection) -> None:
     await pc.close()
     if not _active_pcs and _active_source is not None:
         # Run in a thread so capture-thread joins don't block the event loop.
-        await asyncio.to_thread(_active_source.stop)
+        # asyncio.to_thread requires 3.9+; use run_in_executor for 3.8 compat.
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, _active_source.stop)
         _active_source = None
 
 
@@ -45,7 +47,8 @@ async def close_all() -> None:
         await pc.close()
     _active_pcs.clear()
     if _active_source is not None:
-        await asyncio.to_thread(_active_source.stop)
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, _active_source.stop)
         _active_source = None
 
 
