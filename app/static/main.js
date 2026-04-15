@@ -270,7 +270,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function getCamNameForMode(mode) {
     if (mode === "sensor_fusion") {
-      return "SENSOR_FUSION_CAM";
+      return "OAK-D_S2";
     }
     if (mode === "go2") {
       return "GO2_CAMERA";
