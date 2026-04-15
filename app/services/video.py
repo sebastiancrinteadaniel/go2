@@ -365,7 +365,7 @@ class DepthCameraSource:
         # USB cleanup from a previous session can lag a few seconds; retry the
         # device open instead of failing hard on the first "device busy" error.
         max_attempts = 5
-        last_error: Exception | None = None
+        last_error = None  # type: Exception | None  (kept as comment for Python 3.8 compatibility)
         for attempt in range(1, max_attempts + 1):
             if self._stop_event.is_set():
                 return

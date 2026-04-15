@@ -83,7 +83,7 @@ def run(interface: str):
 
     cv2.namedWindow("Go2 Camera", cv2.WINDOW_NORMAL)
 
-    writer: cv2.VideoWriter | None = None
+    writer = None  # type: cv2.VideoWriter | None  (kept as comment for Python 3.8 compatibility)
     recording = False
     output_path = ""
 
