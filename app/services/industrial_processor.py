@@ -12,12 +12,12 @@ try:
     from ultralytics import YOLO
 
     try:
-        _model = YOLO("app/models/industrial_draft_2.engine")
+        _model = YOLO("app/models/industrial_best.engine")
         logger.info("Industrial: loaded engine model.")
     except Exception as _e:
         logger.warning(f"Industrial engine load failed ({_e}), falling back to .pt")
         try:
-            _model = YOLO("app/models/industrial_draft_2.pt")
+            _model = YOLO("app/models/industrial_best.pt")
             logger.info("Industrial: loaded .pt model.")
         except Exception as _e2:
             logger.error(f"Industrial .pt load also failed ({_e2}). Industrial detection disabled.")
