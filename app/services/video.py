@@ -398,7 +398,7 @@ class DepthCameraSource:
         pipeline = dai.Pipeline()
 
         cam_rgb = pipeline.create(dai.node.ColorCamera)
-        cam_rgb.setPreviewSize(640, 480)
+        cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
         cam_rgb.setInterleaved(False)
         cam_rgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
         cam_rgb.setFps(30)
@@ -422,7 +422,7 @@ class DepthCameraSource:
         xout_depth = pipeline.create(dai.node.XLinkOut)
         xout_depth.setStreamName("depth")
 
-        cam_rgb.preview.link(xout_rgb.input)
+        cam_rgb.video.link(xout_rgb.input)
         stereo.depth.link(xout_depth.input)
 
         return pipeline
@@ -444,7 +444,10 @@ class DepthCameraSource:
                     if depth_msg is not None:
                         latest_depth = depth_msg.getFrame()
                     if rgb_msg is not None and latest_depth is not None:
-                        _safe_put(self._frame_queue, (rgb_msg.getCvFrame(), latest_depth.copy()))
+                        # Camera is physically mounted upside down — rotate 180°
+                        rgb_frame = cv2.flip(rgb_msg.getCvFrame(), -1)
+                        depth_frame = cv2.flip(latest_depth.copy(), -1)
+                        _safe_put(self._frame_queue, (rgb_frame, depth_frame))
                     else:
                         self._stop_event.wait(0.002)
         except Exception as e:
