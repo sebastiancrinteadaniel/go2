@@ -22,26 +22,6 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        from unitree_sdk2py.core.channel import ChannelFactoryInitialize
-        import psutil
-        import os
-
-        # Determine network interface - eth0 for Jetson or lo for local/simulation
-        is_jetson = os.path.exists("/etc/nv_tegra_release")
-        has_eth0 = "eth0" in psutil.net_if_addrs()
-
-        if is_jetson and has_eth0:
-            ChannelFactoryInitialize(0, "eth0")
-            logger.info("Initialized Unitree SDK with eth0")
-        else:
-            ChannelFactoryInitialize(0, "lo")
-            logger.info("Initialized Unitree SDK with loopback (lo)")
-    except ImportError:
-        logger.warning("'unitree_sdk2py' not found. SDK capabilities disabled.")
-    except Exception as e:
-        logger.error(f"Error initializing Unitree SDK: {e}")
-
-    try:
         import torch
         if torch.cuda.is_available():
             logger.info(f"PyTorch CUDA available — device: {torch.cuda.get_device_name(0)}")

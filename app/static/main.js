@@ -488,6 +488,16 @@ document.addEventListener("DOMContentLoaded", () => {
           if (data.type === "stats") {
             if (data.camera_connected === false) {
               loadingOverlay.classList.add("hidden");
+              const _errTitle = document.getElementById("camera-error-text");
+              const _errSub   = document.getElementById("camera-error-sub");
+              if (_errTitle) {
+                const titles = { go2: "GO2 CAMERA UNAVAILABLE", sensor_fusion: "OAK-D UNAVAILABLE", hd_view: "CAMERA UNAVAILABLE" };
+                _errTitle.textContent = titles[currentMode] || "CAMERA UNAVAILABLE";
+              }
+              if (_errSub) {
+                const subs = { go2: "CHECK SDK CONNECTION", sensor_fusion: "ENSURE DEPTHAI IS INSTALLED & OAK-D IS CONNECTED", hd_view: "CHECK USB CONNECTION" };
+                _errSub.textContent = data.camera_error || subs[currentMode] || "CHECK CONNECTION";
+              }
               if (cameraErrorOverlay) cameraErrorOverlay.classList.remove("hidden");
             } else if (data.initializing === false && !loadingOverlay.classList.contains("hidden")) {
               loadingOverlay.classList.add("hidden");

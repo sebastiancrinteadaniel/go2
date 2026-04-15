@@ -14,7 +14,7 @@ from datetime import datetime
 from aiortc import RTCPeerConnection, RTCSessionDescription
 
 from app.core.config import settings
-from app.services.video import CameraSource, Go2CameraSource, ViewerTrack
+from app.services.video import CameraSource, Go2CameraSource, DepthCameraSource, ViewerTrack
 from app.services.telemetry import telemetry
 from app.services.report_generator import ReportData, build_pdf, next_report_id
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_active_source: CameraSource | Go2CameraSource | None = None
+_active_source: CameraSource | Go2CameraSource | DepthCameraSource | None = None
 _active_pcs: set[RTCPeerConnection] = set()
 _active_mode: str = "hd_view"
 
@@ -89,6 +89,8 @@ async def offer(request: Request):
     if _active_source is None:
         if mode == "go2":
             _active_source = Go2CameraSource()
+        elif mode == "sensor_fusion":
+            _active_source = DepthCameraSource()
         else:
             _active_source = CameraSource()
         telemetry.init()
@@ -142,6 +144,7 @@ async def offer(request: Request):
                         "type": "stats",
                         "initializing": getattr(source, "_initializing", False),
                         "camera_connected": getattr(source, "connected", True),
+                        "camera_error": getattr(source, "camera_error", ""),
                         "cpu_percent": cpu_percent,
                         "ram_percent": ram.percent,
                         "uptime": uptime_seconds,
@@ -242,7 +245,7 @@ async def generate_report(request: Request):
         except Exception:
             pass
 
-    camera_source_map = {"go2": "Go2 Camera"}
+    camera_source_map = {"go2": "Go2 Camera", "sensor_fusion": "OAK-D S2 Sensor Fusion"}
     robot_connected = telemetry.connected and (time.time() - telemetry.last_update) < 2.0
 
     data = ReportData(
