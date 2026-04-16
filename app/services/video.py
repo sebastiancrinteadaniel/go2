@@ -347,9 +347,10 @@ class DepthCameraSource:
 
         cam_rgb = pipeline.create(dai.node.ColorCamera)
         cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
+        cam_rgb.setIspScale(1, 2)          # 1920×1080 → 960×540 — fits USB 2.0 bandwidth
         cam_rgb.setInterleaved(False)
         cam_rgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
-        cam_rgb.setFps(30)
+        cam_rgb.setFps(15)
         cam_rgb.initialControl.setManualFocus(130)
 
         cam_left = pipeline.create(dai.node.MonoCamera)
@@ -372,7 +373,7 @@ class DepthCameraSource:
         xout_depth = pipeline.create(dai.node.XLinkOut)
         xout_depth.setStreamName("depth")
 
-        cam_rgb.video.link(xout_rgb.input)
+        cam_rgb.isp.link(xout_rgb.input)   # isp output carries the ISP-scaled frame
         stereo.depth.link(xout_depth.input)
 
         return pipeline
