@@ -13,6 +13,7 @@ from app.services.yolo_processor import YOLOProcessor
 from app.services.industrial_processor import IndustrialProcessor
 from app.services.gesture_processor import GestureProcessor
 from app.services.gesture_dispatcher import GestureDispatcher
+from app.services.industrial_depth_processor import IndustrialDepthProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -292,7 +293,7 @@ class DepthCameraSource:
             logger.error(f"Error building DepthAI pipeline: {e}")
 
         self.yolo_processor = YOLOProcessor()
-        self.industrial_processor = IndustrialProcessor()
+        self.industrial_processor = IndustrialDepthProcessor()
         self.gesture_processor = GestureProcessor()
         self.session_detections: dict = {}
         # Gesture dispatch works whenever the Unitree SDK is importable —
@@ -333,6 +334,7 @@ class DepthCameraSource:
         cam_rgb.setInterleaved(False)
         cam_rgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
         cam_rgb.setFps(30)
+        cam_rgb.initialControl.setManualFocus(130)
 
         cam_left = pipeline.create(dai.node.MonoCamera)
         cam_left.setBoardSocket(dai.CameraBoardSocket.CAM_B)
@@ -427,7 +429,7 @@ class DepthCameraSource:
                 annotated, detections = frame, []
 
             if self.industrial_processor.enabled:
-                annotated, industrial_detections = self.industrial_processor.process(annotated)
+                annotated, industrial_detections = self.industrial_processor.process(annotated, depth_raw)
             else:
                 industrial_detections = []
 
