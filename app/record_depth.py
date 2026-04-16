@@ -37,7 +37,8 @@ def build_pipeline() -> dai.Pipeline:
     pipeline = dai.Pipeline()
 
     cam_rgb = pipeline.create(dai.node.ColorCamera)
-    cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_720_P)
+    cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
+    cam_rgb.setIspScale(1, 2)  # 1920×1080 → 960×540 over USB
     cam_rgb.setInterleaved(False)
     cam_rgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
     cam_rgb.setFps(15)
@@ -59,7 +60,7 @@ def build_pipeline() -> dai.Pipeline:
 
     sync = pipeline.create(dai.node.Sync)
     sync.setSyncThreshold(timedelta(milliseconds=33))  # half a frame at 15 fps
-    cam_rgb.video.link(sync.inputs["rgb"])
+    cam_rgb.isp.link(sync.inputs["rgb"])
     stereo.depth.link(sync.inputs["depth"])
 
     xout = pipeline.create(dai.node.XLinkOut)
