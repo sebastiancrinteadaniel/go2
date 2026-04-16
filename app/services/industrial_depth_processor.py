@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 _IMGSZ = 640
-_CONF = 0.15
+_CONF = 0.35             # matches detect_depth_live.py — tighter than 0.15 to reduce noise
 _PLOW, _PHIGH = 2, 98   # percentile clip — matches train_depth.py preprocessing
 
 logger = logging.getLogger(__name__)

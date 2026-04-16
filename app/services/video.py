@@ -13,6 +13,7 @@ from app.services.yolo_processor import YOLOProcessor
 from app.services.industrial_processor import IndustrialProcessor
 from app.services.gesture_processor import GestureProcessor
 from app.services.gesture_dispatcher import GestureDispatcher
+from app.services.industrial_depth_processor import IndustrialDepthProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -308,7 +309,7 @@ class DepthCameraSource:
             logger.error(f"Error building DepthAI pipeline: {e}")
 
         self.yolo_processor = YOLOProcessor()
-        self.industrial_processor = IndustrialProcessor()
+        self.industrial_processor = IndustrialDepthProcessor()
         self.gesture_processor = GestureProcessor()
         self.session_detections: dict = {}
         # Gesture dispatch works whenever the Unitree SDK is importable —
@@ -445,21 +446,7 @@ class DepthCameraSource:
                 annotated, detections = frame, []
 
             if self.industrial_processor.enabled:
-                annotated, industrial_detections = self.industrial_processor.process(annotated)
-                # Build depth colormap and stamp the same RGB boxes onto it for the PiP
-                valid = depth_raw[depth_raw > 0]
-                lo, hi = (np.percentile(valid, [2, 98]) if valid.size > 0 else (0.0, 1.0))
-                clipped = np.clip(depth_raw.astype(np.float32), lo, hi)
-                d_u8 = ((clipped - lo) / max(float(hi - lo), 1.0) * 255).astype(np.uint8)
-                depth_pip = cv2.applyColorMap(d_u8, cv2.COLORMAP_TURBO)
-                for det in industrial_detections:
-                    x1, y1, x2, y2 = det["bbox"]
-                    cv2.rectangle(depth_pip, (x1, y1), (x2, y2), (0, 200, 255), 2)
-                    lbl = f"{det['class']} {det['conf']:.2f}"
-                    (tw, th), _ = cv2.getTextSize(lbl, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 1)
-                    cv2.rectangle(depth_pip, (x1, y1 - th - 6), (x1 + tw + 4, y1), (0, 200, 255), -1)
-                    cv2.putText(depth_pip, lbl, (x1 + 2, y1 - 3),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1, cv2.LINE_AA)
+                annotated, depth_pip, industrial_detections = self.industrial_processor.process(annotated, depth_raw)
             else:
                 depth_pip, industrial_detections = None, []
 

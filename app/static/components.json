@@ -29,6 +29,12 @@
       "label": "Hex Bolt",
       "yolo_classes": ["hex_bolt", "hex bolt", "bolt", "hex_bolt_b1"],
       "damaged_classes": ["bolt_damaged", "damaged_bolt", "hex_bolt_damaged"]
+    },
+    {
+      "id": "main_pipe",
+      "label": "Main Pipe",
+      "yolo_classes": ["pipe", "main_pipe", "main pipe", "pipe_main"],
+      "damaged_classes": ["pipe_damaged", "damaged_pipe", "main_pipe_damaged"]
     }
   ]
 }
