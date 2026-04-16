@@ -351,7 +351,6 @@ class DepthCameraSource:
         cam_rgb.setInterleaved(False)
         cam_rgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
         cam_rgb.setFps(15)
-        cam_rgb.initialControl.setManualFocus(130)
 
         cam_left = pipeline.create(dai.node.MonoCamera)
         cam_left.setBoardSocket(dai.CameraBoardSocket.CAM_B)
@@ -364,7 +363,6 @@ class DepthCameraSource:
         stereo = pipeline.create(dai.node.StereoDepth)
         stereo.setLeftRightCheck(True)
         stereo.setSubpixel(False)
-        stereo.setDepthAlign(dai.CameraBoardSocket.CAM_A)  # warp depth to RGB perspective
         cam_left.out.link(stereo.left)
         cam_right.out.link(stereo.right)
 
