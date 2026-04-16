@@ -363,6 +363,7 @@ class DepthCameraSource:
         stereo = pipeline.create(dai.node.StereoDepth)
         stereo.setLeftRightCheck(True)
         stereo.setSubpixel(False)
+        stereo.setDepthAlign(dai.CameraBoardSocket.CAM_A)
         cam_left.out.link(stereo.left)
         cam_right.out.link(stereo.right)
 
