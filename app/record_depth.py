@@ -37,15 +37,18 @@ def build_pipeline() -> dai.Pipeline:
     pipeline = dai.Pipeline()
 
     cam_rgb = pipeline.create(dai.node.ColorCamera)
+    cam_rgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_720_P)
     cam_rgb.setInterleaved(False)
     cam_rgb.setColorOrder(dai.ColorCameraProperties.ColorOrder.BGR)
-    cam_rgb.setFps(30)
+    cam_rgb.setFps(15)
 
     cam_left = pipeline.create(dai.node.MonoCamera)
     cam_left.setBoardSocket(dai.CameraBoardSocket.CAM_B)
+    cam_left.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
 
     cam_right = pipeline.create(dai.node.MonoCamera)
     cam_right.setBoardSocket(dai.CameraBoardSocket.CAM_C)
+    cam_right.setResolution(dai.MonoCameraProperties.SensorResolution.THE_400_P)
 
     stereo = pipeline.create(dai.node.StereoDepth)
     stereo.setLeftRightCheck(True)
@@ -55,7 +58,7 @@ def build_pipeline() -> dai.Pipeline:
     cam_right.out.link(stereo.right)
 
     sync = pipeline.create(dai.node.Sync)
-    sync.setSyncThreshold(timedelta(milliseconds=17))  # half a frame at 30 fps
+    sync.setSyncThreshold(timedelta(milliseconds=33))  # half a frame at 15 fps
     cam_rgb.video.link(sync.inputs["rgb"])
     stereo.depth.link(sync.inputs["depth"])
 
@@ -102,7 +105,7 @@ def run():
         fps_counter = 0
         fps_display = 0.0
         fps_tick = time.time()
-        fps_target = 30
+        fps_target = 15
         frame_delay = 1.0 / fps_target
         last_time = time.time()
 
