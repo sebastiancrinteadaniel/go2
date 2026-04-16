@@ -18,24 +18,40 @@ from app.services.industrial_depth_processor import IndustrialDepthProcessor
 logger = logging.getLogger(__name__)
 
 
-def _overlay_depth_pip(frame: np.ndarray, depth_raw: np.ndarray) -> np.ndarray:
+def _overlay_depth_pip(
+    frame: np.ndarray,
+    depth_raw: np.ndarray,
+    depth_annotated: np.ndarray = None,
+) -> np.ndarray:
     """Overlay a colourised depth minimap in the bottom-right corner of *frame*.
 
-    Depth values are clipped to 0–5 000 mm and mapped with COLORMAP_TURBO
-    (blue ≈ close, red ≈ far).
+    If *depth_annotated* is provided (already colourised + annotated by the
+    industrial processor) it is used directly.  Otherwise a plain Turbo
+    colourmap is built from *depth_raw* using per-frame percentile
+    normalisation (2–98th percentile of non-zero pixels).
     """
     h, w = frame.shape[:2]
     pip_w, pip_h = w // 4, h // 4
 
-    clipped = np.clip(depth_raw, 0, 5000).astype(np.float32)
-    normalized = (clipped / 5000 * 255).astype(np.uint8)
-    depth_color = cv2.applyColorMap(normalized, cv2.COLORMAP_TURBO)
+    if depth_annotated is not None:
+        depth_color = depth_annotated
+    else:
+        valid = depth_raw[depth_raw > 0]
+        if valid.size > 0:
+            lo, hi = np.percentile(valid, [2, 98])
+        else:
+            lo, hi = 0.0, 1.0
+        clipped = np.clip(depth_raw.astype(np.float32), lo, hi)
+        d_u8 = ((clipped - lo) / max(float(hi - lo), 1.0) * 255).astype(np.uint8)
+        depth_color = cv2.applyColorMap(d_u8, cv2.COLORMAP_TURBO)
+
     depth_resized = cv2.resize(depth_color, (pip_w, pip_h))
 
     # Thin border + label
     cv2.rectangle(depth_resized, (0, 0), (pip_w - 1, pip_h - 1), (180, 180, 180), 1)
+    label = "DEPTH  AI" if depth_annotated is not None else "DEPTH"
     cv2.putText(
-        depth_resized, "DEPTH (0-5m)", (4, pip_h - 6),
+        depth_resized, label, (4, pip_h - 6),
         cv2.FONT_HERSHEY_SIMPLEX, 0.35, (255, 255, 255), 1, cv2.LINE_AA,
     )
 
@@ -429,9 +445,9 @@ class DepthCameraSource:
                 annotated, detections = frame, []
 
             if self.industrial_processor.enabled:
-                annotated, industrial_detections = self.industrial_processor.process(annotated, depth_raw)
+                annotated, depth_pip, industrial_detections = self.industrial_processor.process(annotated, depth_raw)
             else:
-                industrial_detections = []
+                depth_pip, industrial_detections = None, []
 
             if self.gesture_processor.enabled:
                 annotated, gestures = self.gesture_processor.process(annotated)
@@ -440,8 +456,8 @@ class DepthCameraSource:
 
             self.gesture_dispatcher.process(gestures)
 
-            # Composite depth PiP onto the annotated RGB frame
-            annotated = _overlay_depth_pip(annotated, depth_raw)
+            # Composite depth PiP (annotated when industrial is active) onto RGB
+            annotated = _overlay_depth_pip(annotated, depth_raw, depth_pip)
 
             self._last_frame = annotated
             self.latest_detections = detections
