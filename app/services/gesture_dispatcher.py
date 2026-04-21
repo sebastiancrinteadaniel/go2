@@ -161,7 +161,7 @@ class GestureDispatcher:
     def _action_heart(self) -> None:
         if self._sport_client is None:
             return
-        self._sport_client.Heart()
+        # self._sport_client.Heart()
 
     def _action_dislike(self) -> None:
         if self._sport_client is None:
