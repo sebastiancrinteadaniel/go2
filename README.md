@@ -73,7 +73,6 @@ Browser
 
 ### Prerequisites
 
-- Python 3.10+
 - [uv](https://github.com/astral-sh/uv) package manager
 - `unitree_sdk2py` — optional; required for Go2 camera, robot control, and live telemetry (battery, motor temps). Falls back gracefully to webcam mode without it.
 - CUDA / ONNX Runtime GPU — optional, falls back to CPU inference automatically

@@ -26,7 +26,6 @@ async def lifespan(app: FastAPI):
         import psutil
         import os
 
-        # Determine network interface - eth0 for Jetson or lo for local/simulation
         is_jetson = os.path.exists("/etc/nv_tegra_release")
         has_eth0 = "eth0" in psutil.net_if_addrs()
 

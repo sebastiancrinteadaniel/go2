@@ -311,8 +311,6 @@ class DepthCameraSource:
         self.industrial_processor = IndustrialProcessor()
         self.gesture_processor = GestureProcessor()
         self.session_detections: dict = {}
-        # Gesture dispatch works whenever the Unitree SDK is importable —
-        # ChannelFactoryInitialize is already called at app startup in main.py.
         self.gesture_dispatcher = GestureDispatcher(
             enabled=True,
             cooldown_seconds=settings.GESTURE_DISPATCH_COOLDOWN,
@@ -380,10 +378,8 @@ class DepthCameraSource:
         if not self.connected or self._pipeline is None:
             return
 
-        # USB cleanup from a previous session can lag a few seconds; retry the
-        # device open instead of failing hard on the first "device busy" error.
         max_attempts = 5
-        last_error = None  # type: Exception | None  (kept as comment for Python 3.8 compatibility)
+        last_error = None  
         for attempt in range(1, max_attempts + 1):
             if self._stop_event.is_set():
                 return
@@ -445,7 +441,6 @@ class DepthCameraSource:
 
             if self.industrial_processor.enabled:
                 annotated, industrial_detections = self.industrial_processor.process(annotated)
-                # Stamp the same RGB boxes onto the depth colormap for the PiP
                 valid = depth_raw[depth_raw > 0]
                 lo, hi = (np.percentile(valid, [2, 98]) if valid.size > 0 else (0.0, 1.0))
                 clipped = np.clip(depth_raw.astype(np.float32), lo, hi)
@@ -469,7 +464,6 @@ class DepthCameraSource:
 
             self.gesture_dispatcher.process(gestures)
 
-            # Composite depth PiP (annotated when industrial is active) onto RGB
             annotated = _overlay_depth_pip(annotated, depth_raw, depth_pip)
 
             self._last_frame = annotated
@@ -486,8 +480,7 @@ class DepthCameraSource:
     def stop(self):
         self._stop_event.set()
         self.gesture_processor.stop()
-        # Wait for the capture thread to exit its `with dai.Device(...)` block
-        # so the OAK-D USB handle is fully released before a new source opens.
+
         if self._capture_thread.is_alive():
             self._capture_thread.join(timeout=3.0)
         if self._inference_thread.is_alive():
