@@ -174,6 +174,50 @@ class GestureDispatcher:
             return
         self._sport_client.Hello()
 
+    _MAX_LINEAR = 0.5  # m/s
+    _MAX_YAW = 0.8     # rad/s
+
+    def handle_joystick(self, lx: float, ly: float, rx: float) -> None:
+        """Send a Move command from gamepad joystick values (all in [-1, 1])."""
+        if self._sport_client is None:
+            return
+        try:
+            vx = round(float(ly) * self._MAX_LINEAR, 3)
+            vy = round(float(lx) * self._MAX_LINEAR, 3)
+            vyaw = round(float(rx) * self._MAX_YAW, 3)
+            self._sport_client.Move(vx, vy, vyaw)
+        except Exception as e:
+            logger.error("Joystick move error: %s", e)
+
+    def handle_action(self, cmd: str) -> None:
+        """Execute a named action from the gamepad panel."""
+        if self._sport_client is None:
+            return
+        action_map = {
+            "stand":          self._sport_client.StandUp,
+            "sit":            self._sport_client.StandDown,
+            "stop_move":      self._sport_client.StopMove,
+            "balance_stand":  self._sport_client.BalanceStand,
+            "wave":           self._sport_client.Hello,
+            "dance":          self._sport_client.Dance1,
+            "dance2":         self._sport_client.Dance2,
+            "stretch":        self._sport_client.Stretch,
+            "free_walk":      self._sport_client.FreeWalk,
+            "recover":        self._sport_client.RecoveryStand,
+        }
+        action = action_map.get(cmd)
+        if action:
+            threading.Thread(
+                target=self._call_safe, args=(cmd, action), daemon=True
+            ).start()
+
+    def _call_safe(self, label: str, fn: Callable[[], None]) -> None:
+        try:
+            fn()
+            logger.info("Gamepad action: %s", label)
+        except Exception as e:
+            logger.error("Gamepad action %s failed: %s", label, e)
+
     def _action_pinkie(self) -> None:
         if self._sport_client is None:
             return

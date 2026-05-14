@@ -774,4 +774,176 @@ function applyLatencyColor(el, ms) {
 
     renderComponentList();
   }
+
+  // ---- GAMEPAD PANEL ----
+  const gamepadToggleBtn = document.getElementById("gamepad-toggle-btn");
+  const gamepadPanel = document.getElementById("gamepad-panel");
+  const leftCanvas = document.getElementById("joystick-left");
+  const rightCanvas = document.getElementById("joystick-right");
+
+  const joystickState = { lx: 0, ly: 0, rx: 0, ry: 0 };
+
+  function makeJoystick(canvas, onUpdate) {
+    const ctx = canvas.getContext("2d");
+    const SIZE = canvas.width;
+    const R = SIZE / 2;
+    const KNOB_R = 20;
+    const RING_R = R - KNOB_R - 5;
+    let active = false;
+    let kx = R, ky = R;
+
+    function draw() {
+      ctx.clearRect(0, 0, SIZE, SIZE);
+      // outer ring
+      ctx.beginPath();
+      ctx.arc(R, R, RING_R, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255,255,255,0.10)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // crosshairs
+      ctx.strokeStyle = "rgba(255,255,255,0.05)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(R, R - RING_R); ctx.lineTo(R, R + RING_R); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(R - RING_R, R); ctx.lineTo(R + RING_R, R); ctx.stroke();
+      // knob shadow
+      ctx.beginPath();
+      ctx.arc(kx, ky, KNOB_R + 4, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(59,130,246,0.12)";
+      ctx.fill();
+      // knob
+      ctx.beginPath();
+      ctx.arc(kx, ky, KNOB_R, 0, Math.PI * 2);
+      ctx.fillStyle = active ? "rgba(59,130,246,0.95)" : "rgba(59,130,246,0.55)";
+      ctx.fill();
+      ctx.strokeStyle = active ? "#60a5fa" : "rgba(59,130,246,0.5)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = SIZE / rect.width;
+      const scaleY = SIZE / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY,
+      };
+    }
+
+    function move(px, py) {
+      const dx = px - R, dy = py - R;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > RING_R) {
+        kx = R + (dx / dist) * RING_R;
+        ky = R + (dy / dist) * RING_R;
+      } else {
+        kx = px; ky = py;
+      }
+      onUpdate((kx - R) / RING_R, (ky - R) / RING_R);
+      draw();
+    }
+
+    function reset() {
+      active = false;
+      kx = R; ky = R;
+      onUpdate(0, 0);
+      draw();
+      // send a final zeroed message immediately
+      if (isConnected && dc && dc.readyState === "open") {
+        dc.send(JSON.stringify({ type: "joystick", ...joystickState }));
+      }
+    }
+
+    canvas.addEventListener("pointerdown", (e) => {
+      canvas.setPointerCapture(e.pointerId);
+      active = true;
+      move(...Object.values(getPos(e)));
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!active) return;
+      const pos = getPos(e);
+      move(pos.x, pos.y);
+    });
+    canvas.addEventListener("pointerup", reset);
+    canvas.addEventListener("pointercancel", reset);
+
+    function setExternal(nx, ny) {
+      const isZero = nx === 0 && ny === 0;
+      active = !isZero;
+      kx = R + nx * RING_R;
+      ky = R + ny * RING_R;
+      onUpdate(nx, ny);
+      draw();
+      if (isZero && isConnected && dc && dc.readyState === "open") {
+        dc.send(JSON.stringify({ type: "joystick", ...joystickState }));
+      }
+    }
+
+    draw();
+    return { setExternal };
+  }
+
+  const leftJoystick = makeJoystick(leftCanvas, (x, y) => {
+    joystickState.lx = x;
+    joystickState.ly = -y;
+  });
+
+  makeJoystick(rightCanvas, (x, y) => {
+    joystickState.rx = x;
+    joystickState.ry = -y;
+  });
+
+  // WASD keyboard → left (move) joystick only
+  const wasd = { w: false, a: false, s: false, d: false };
+
+  function applyWasd() {
+    let nx = 0, ny = 0;
+    if (wasd.a) nx -= 1;
+    if (wasd.d) nx += 1;
+    if (wasd.w) ny -= 1;
+    if (wasd.s) ny += 1;
+    const len = Math.sqrt(nx * nx + ny * ny);
+    if (len > 1) { nx /= len; ny /= len; }
+    leftJoystick.setExternal(nx, ny);
+  }
+
+  document.addEventListener("keydown", (e) => {
+    const k = e.key.toLowerCase();
+    if (!(k in wasd)) return;
+    if (!gamepadPanel.classList.contains("open")) return;
+    e.preventDefault();
+    if (wasd[k]) return;
+    wasd[k] = true;
+    applyWasd();
+  });
+
+  document.addEventListener("keyup", (e) => {
+    const k = e.key.toLowerCase();
+    if (!(k in wasd)) return;
+    if (wasd[k]) { wasd[k] = false; applyWasd(); }
+  });
+
+  // send joystick state every 50 ms when non-zero
+  setInterval(() => {
+    const { lx, ly, rx, ry } = joystickState;
+    if (!isConnected || !dc || dc.readyState !== "open") return;
+    if (Math.abs(lx) < 0.04 && Math.abs(ly) < 0.04 && Math.abs(rx) < 0.04 && Math.abs(ry) < 0.04) return;
+    dc.send(JSON.stringify({ type: "joystick", lx, ly, rx, ry }));
+  }, 50);
+
+  // action buttons
+  document.querySelectorAll(".action-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (!isConnected || !dc || dc.readyState !== "open") return;
+      dc.send(JSON.stringify({ type: "action", cmd: btn.dataset.cmd }));
+    });
+  });
+
+  // panel toggle
+  if (gamepadToggleBtn && gamepadPanel) {
+    gamepadToggleBtn.addEventListener("click", () => {
+      gamepadPanel.classList.toggle("open");
+      gamepadToggleBtn.classList.toggle("active");
+    });
+  }
 });

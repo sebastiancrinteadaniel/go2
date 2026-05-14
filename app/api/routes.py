@@ -195,6 +195,22 @@ async def offer(request: Request):
                         "Gesture dispatch %s",
                         "enabled" if dispatcher.enabled else "disabled",
                     )
+            else:
+                try:
+                    data = json.loads(message)
+                    msg_type = data.get("type")
+                    dispatcher = getattr(source, "gesture_dispatcher", None)
+                    if dispatcher is not None:
+                        if msg_type == "joystick":
+                            dispatcher.handle_joystick(
+                                float(data.get("lx", 0)),
+                                float(data.get("ly", 0)),
+                                float(data.get("rx", 0)),
+                            )
+                        elif msg_type == "action":
+                            dispatcher.handle_action(str(data.get("cmd", "")))
+                except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+                    pass
 
     viewer_track = ViewerTrack(source)
     pc.addTrack(viewer_track)
