@@ -928,16 +928,16 @@ body {
 }
 
 .gamepad-panel.open {
-    max-height: 290px;
+    max-height: 460px;
     border-color: var(--border-color);
 }
 
 .gamepad-panel-inner {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     padding: 1rem 2rem;
-    gap: 3rem;
+    gap: 2rem;
 }
 
 .joystick-wrapper {
@@ -945,6 +945,7 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
+    flex-shrink: 0;
 }
 
 .joystick-label {
@@ -959,12 +960,44 @@ body {
     touch-action: none;
 }
 
+.action-scroll {
+    flex: 1;
+    max-width: 320px;
+    overflow-y: auto;
+    max-height: 400px;
+    padding-right: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.action-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+
+.action-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.action-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+}
+
+.action-group-label {
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--text-secondary);
+    padding: 0.2rem 0 0.1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    margin-bottom: 0.1rem;
+}
+
 .action-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.45rem;
-    flex: 1;
-    max-width: 230px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.4rem;
 }
 
 .action-btn {
@@ -992,6 +1025,72 @@ body {
     background: rgba(59, 130, 246, 0.25);
     border-color: var(--accent-blue);
     color: #fff;
+}
+
+.speed-sliders {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.speed-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.speed-slider-label {
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+    width: 3rem;
+    flex-shrink: 0;
+}
+
+.speed-slider-val {
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: #e2e8f0;
+    width: 3.2rem;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.speed-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+.speed-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.speed-slider::-webkit-slider-thumb:hover {
+    background: #60a5fa;
+}
+
+.speed-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
 }
 
 .gamepad-toggle-wrap {

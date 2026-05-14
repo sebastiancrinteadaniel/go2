@@ -157,6 +157,8 @@ async def offer(request: Request):
                         "industrial_enabled": source.industrial_processor.enabled,
                         "gesture_enabled": source.gesture_processor.enabled,
                         "gesture_dispatch_enabled": getattr(_dispatcher, "enabled", False),
+                        "max_linear": getattr(_dispatcher, "_max_linear", 0.7),
+                        "max_yaw": getattr(_dispatcher, "_max_yaw", 1.0),
                         "battery": telemetry.battery_soc,
                         "connected": telemetry.connected and ((time.time() - telemetry.last_update) < 2.0),
                         "motor_temps": motor_temps,
@@ -209,6 +211,11 @@ async def offer(request: Request):
                             )
                         elif msg_type == "action":
                             dispatcher.handle_action(str(data.get("cmd", "")))
+                        elif msg_type == "set_speed":
+                            dispatcher.set_speed_limits(
+                                float(data.get("linear", 0.7)),
+                                float(data.get("yaw", 1.0)),
+                            )
                 except (json.JSONDecodeError, KeyError, ValueError, TypeError):
                     pass
 

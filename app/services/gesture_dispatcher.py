@@ -43,6 +43,8 @@ class GestureDispatcher:
         self._gesture_actions: Dict[str, Callable[[], None]] = {}
         self._last_dispatch: Optional[dict] = None
         self._dispatch_event_lock = threading.Lock()
+        self._max_linear: float = 0.7
+        self._max_yaw: float = 1.0
         self._init_client_and_actions()
 
     def _init_client_and_actions(self) -> None:
@@ -71,6 +73,7 @@ class GestureDispatcher:
                 self._min_stable_frames,
             )
         except Exception as e:
+            self._sport_client = None
             self.enabled = False
             logger.error("Gesture dispatch disabled: failed to initialize SportClient: %s", e)
 
@@ -174,18 +177,32 @@ class GestureDispatcher:
             return
         self._sport_client.Hello()
 
-    _MAX_LINEAR = 0.5  # m/s
-    _MAX_YAW = 0.8     # rad/s
+    _LINEAR_MIN = 0.1
+    _LINEAR_MAX = 0.9
+    _YAW_MIN = 0.1
+    _YAW_MAX = 1.7
+
+    def set_speed_limits(self, linear: float, yaw: float) -> None:
+        self._max_linear = max(self._LINEAR_MIN, min(self._LINEAR_MAX, float(linear)))
+        self._max_yaw = max(self._YAW_MIN, min(self._YAW_MAX, float(yaw)))
+        logger.info("Speed limits updated: linear=%.2f yaw=%.2f", self._max_linear, self._max_yaw)
 
     def handle_joystick(self, lx: float, ly: float, rx: float) -> None:
         """Send a Move command from gamepad joystick values (all in [-1, 1])."""
         if self._sport_client is None:
             return
+        vx = round(float(ly) * self._max_linear, 3)
+        vy = round(-float(lx) * self._max_linear, 3)
+        vyaw = round(-float(rx) * self._max_yaw, 3)
+        threading.Thread(
+            target=self._move_safe, args=(vx, vy, vyaw), daemon=True
+        ).start()
+
+    def _move_safe(self, vx: float, vy: float, vyaw: float) -> None:
         try:
-            vx = round(float(ly) * self._MAX_LINEAR, 3)
-            vy = round(float(lx) * self._MAX_LINEAR, 3)
-            vyaw = round(float(rx) * self._MAX_YAW, 3)
-            self._sport_client.Move(vx, vy, vyaw)
+            rc = self._sport_client.Move(vx, vy, vyaw)
+            if rc != 0:
+                logger.warning("Move returned error code %s (vx=%.3f vy=%.3f vyaw=%.3f)", rc, vx, vy, vyaw)
         except Exception as e:
             logger.error("Joystick move error: %s", e)
 
@@ -193,23 +210,74 @@ class GestureDispatcher:
         """Execute a named action from the gamepad panel."""
         if self._sport_client is None:
             return
-        action_map = {
-            "stand":          self._sport_client.StandUp,
-            "sit":            self._sport_client.StandDown,
-            "stop_move":      self._sport_client.StopMove,
-            "balance_stand":  self._sport_client.BalanceStand,
-            "wave":           self._sport_client.Hello,
-            "dance":          self._sport_client.Dance1,
-            "dance2":         self._sport_client.Dance2,
-            "stretch":        self._sport_client.Stretch,
-            "free_walk":      self._sport_client.FreeWalk,
-            "recover":        self._sport_client.RecoveryStand,
+        if cmd == "stand":
+            threading.Thread(target=self._action_stand, daemon=True).start()
+            return
+        sc = self._sport_client
+        action_map: Dict[str, Callable[[], None]] = {
+            # movement
+            "damp":                 sc.Damp,
+            "sit":                  sc.StandDown,
+            "stop_move":            sc.StopMove,
+            "balance_stand":        sc.BalanceStand,
+            "free_walk":            sc.FreeWalk,
+            "recover":              sc.RecoveryStand,
+            "static_walk":          sc.StaticWalk,
+            "trot_run":             sc.TrotRun,
+            "switch_avoid":         sc.SwitchAvoidMode,
+            # tricks
+            "wave":                 sc.Hello,
+            "dance":                sc.Dance1,
+            "dance2":               sc.Dance2,
+            "stretch":              sc.Stretch,
+            "content":              sc.Content,
+            "scrape":               sc.Scrape,
+            "heart":                sc.Heart,
+            "sit_pose":             sc.Sit,
+            "rise_sit":             sc.RiseSit,
+            # acrobatics
+            "front_flip":           sc.FrontFlip,
+            "front_jump":           sc.FrontJump,
+            "front_pounce":         sc.FrontPounce,
+            "left_flip":            sc.LeftFlip,
+            "back_flip":            sc.BackFlip,
+            # bool modes — on/off pairs
+            "handstand_on":         lambda: sc.HandStand(True),
+            "handstand_off":        lambda: sc.HandStand(False),
+            "classic_walk_on":      lambda: sc.ClassicWalk(True),
+            "classic_walk_off":     lambda: sc.ClassicWalk(False),
+            "walk_upright_on":      lambda: sc.WalkUpright(True),
+            "walk_upright_off":     lambda: sc.WalkUpright(False),
+            "free_bound_on":        lambda: sc.FreeBound(True),
+            "free_bound_off":       lambda: sc.FreeBound(False),
+            "free_jump_on":         lambda: sc.FreeJump(True),
+            "free_jump_off":        lambda: sc.FreeJump(False),
+            "free_avoid_on":        lambda: sc.FreeAvoid(True),
+            "free_avoid_off":       lambda: sc.FreeAvoid(False),
+            "cross_step_on":        lambda: sc.CrossStep(True),
+            "cross_step_off":       lambda: sc.CrossStep(False),
+            "auto_recovery_on":     lambda: sc.AutoRecoverySet(True),
+            "auto_recovery_off":    lambda: sc.AutoRecoverySet(False),
+            # speed levels
+            "speed_1":              lambda: sc.SpeedLevel(1),
+            "speed_2":              lambda: sc.SpeedLevel(2),
+            "speed_3":              lambda: sc.SpeedLevel(3),
         }
         action = action_map.get(cmd)
         if action:
             threading.Thread(
                 target=self._call_safe, args=(cmd, action), daemon=True
             ).start()
+
+    def _action_stand(self) -> None:
+        try:
+            self._sport_client.StandUp()
+            logger.info("Gamepad action: stand")
+            time.sleep(1.5)
+            self._sport_client.FreeWalk()
+            logger.info("Gamepad action: free_walk (auto after stand)")
+        except Exception as e:
+            logger.error("Stand action failed: %s", e)
 
     def _call_safe(self, label: str, fn: Callable[[], None]) -> None:
         try:

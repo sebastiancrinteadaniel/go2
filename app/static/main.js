@@ -526,6 +526,14 @@ document.addEventListener("DOMContentLoaded", () => {
               isGestureDispatchEnabled = !!data.gesture_dispatch_enabled;
               setToggleButtonState(gestureDispatchBtn, isGestureDispatchEnabled);
             }
+            if (data.max_linear !== undefined && sliderLinear) {
+              sliderLinear.value = data.max_linear;
+              valLinear.textContent = parseFloat(data.max_linear).toFixed(1) + " m/s";
+            }
+            if (data.max_yaw !== undefined && sliderYaw) {
+              sliderYaw.value = data.max_yaw;
+              valYaw.textContent = parseFloat(data.max_yaw).toFixed(1) + " r/s";
+            }
             if (Array.isArray(data.imu_rpy) && data.imu_rpy.length === 3) {
               lastImuRpy = data.imu_rpy;
               renderImuPose();
@@ -938,6 +946,34 @@ function applyLatencyColor(el, ms) {
       dc.send(JSON.stringify({ type: "action", cmd: btn.dataset.cmd }));
     });
   });
+
+  // speed sliders
+  const sliderLinear = document.getElementById("slider-linear");
+  const sliderYaw = document.getElementById("slider-yaw");
+  const valLinear = document.getElementById("val-linear");
+  const valYaw = document.getElementById("val-yaw");
+
+  function sendSpeedLimits() {
+    if (!isConnected || !dc || dc.readyState !== "open") return;
+    dc.send(JSON.stringify({
+      type: "set_speed",
+      linear: parseFloat(sliderLinear.value),
+      yaw: parseFloat(sliderYaw.value),
+    }));
+  }
+
+  if (sliderLinear) {
+    sliderLinear.addEventListener("input", () => {
+      valLinear.textContent = parseFloat(sliderLinear.value).toFixed(1) + " m/s";
+      sendSpeedLimits();
+    });
+  }
+  if (sliderYaw) {
+    sliderYaw.addEventListener("input", () => {
+      valYaw.textContent = parseFloat(sliderYaw.value).toFixed(1) + " r/s";
+      sendSpeedLimits();
+    });
+  }
 
   // panel toggle
   if (gamepadToggleBtn && gamepadPanel) {
